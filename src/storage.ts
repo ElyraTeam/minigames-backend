@@ -1,3 +1,9 @@
+import { Server } from "socket.io";
 import { Game } from "./models/game";
 
-export const games: Game[] = [];
+class Storage {
+  public games: Game[] = [];
+  public io!: Server;
+}
+
+export default new Storage();

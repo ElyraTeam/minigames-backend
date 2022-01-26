@@ -4,8 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 
 import * as errors from "../utils/errors";
 import { nanoid } from "nanoid";
-import { Game, Player, RoomOptions } from "../models/game";
-import { games } from "../storage";
+import { Game, Player, RoomOptions, State } from "../models/game";
+import storage from "../storage";
 
 router.post("/room/create", (req, res) => {
   const body = req.body as { nickname: string; options: RoomOptions };
@@ -15,7 +15,7 @@ router.post("/room/create", (req, res) => {
   const roomId = nanoid(8);
   const game = new Game(roomId, body.nickname, body.options);
 
-  games.push(game);
+  storage.games.push(game);
 
   return res.status(200).json({ roomId });
 });
@@ -24,7 +24,7 @@ router.post("/room/join/:roomId", (req, res) => {
   const roomId = req.params.roomId;
   const { nickname } = req.body as { nickname: string };
 
-  const game = games.find((g) => g.id == roomId);
+  const game = storage.games.find((g) => g.id == roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
@@ -34,13 +34,23 @@ router.post("/room/join/:roomId", (req, res) => {
     return res.status(403).json(errors.roomFull);
   }
 
-  if (game.hasPlayerWithName(nickname)) {
+  const foundPlayer = game.getPlayerWithName(nickname);
+  if (foundPlayer && foundPlayer.sessionId != req.session!.id) {
     return res.status(403).json(errors.nicknameInUse);
   }
 
-  const player = new Player(nickname, false);
+  let player: Player;
+  if (foundPlayer) {
+    player = foundPlayer;
+  } else {
+    if (game.state != State.LOBBY) {
+      return res.status(403).json(errors.gameRunning);
+    }
+
+    player = new Player(nickname, false, req.session!.id!);
+    game.players.push(player);
+  }
   player.authToken = nanoid();
-  game.players.push(player);
 
   return res
     .status(200)

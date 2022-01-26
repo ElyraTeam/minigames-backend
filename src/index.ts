@@ -5,11 +5,13 @@ import * as errors from "./utils/errors";
 import cookieSession from "cookie-session";
 
 import wordRouter from "./routes/wordRoutes";
+import storage from "./storage";
+import { nanoid } from "nanoid";
 
 const app = express();
 const http = createServer(app);
 
-const io = new Server(http);
+storage.io = new Server(http);
 
 const PORT = process.env.PORT || 3000;
 
@@ -41,6 +43,22 @@ app.use(
 );
 app.use(morgan("combined"));
 
+//Assign random id to each session
+app.use((req, res, next) => {
+  if (!req.session) {
+    req.session = {};
+  }
+
+  if (!req.session.id) {
+    req.session.id = nanoid();
+  }
+  next();
+});
+
+app.get("/", (req, res) => {
+  res.status(200).send("All good!");
+});
+
 app.use("/assets", express.static("./static"));
 app.use("/word", wordRouter);
 
@@ -56,7 +74,7 @@ app.use(
   }
 );
 
-io.on("connection", (socket) => {
+storage.io.on("connection", (socket) => {
   console.log("a user connected");
 
   socket.on("authenticate", (data: any) => {
