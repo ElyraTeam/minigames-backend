@@ -1,3 +1,6 @@
+import { Socket } from "socket.io";
+import storage from "../storage";
+
 export interface RoomOptions {
   rounds: number;
   letters: string[];
@@ -24,6 +27,34 @@ export class Game {
     public options: RoomOptions
   ) {}
 
+  sync() {
+    storage.io.to(this.id).emit("sync", {
+      id: this.id,
+      owner: this.owner,
+      state: this.state,
+      currentRound: this.currentRound,
+      currentCategory: this.currentCategory,
+    });
+  }
+
+  syncOptions() {
+    storage.io.to(this.id).emit("options", {
+      id: this.id,
+      options: this.options,
+    });
+  }
+
+  syncPlayers() {
+    storage.io.to(this.id).emit("players", {
+      id: this.id,
+      players: this.players.map((p) => ({
+        nickname: p.nickname,
+        online: p.online,
+        owner: p.owner,
+      })),
+    });
+  }
+
   isFull() {
     return this.players.length == this.options.maxPlayers;
   }
@@ -39,6 +70,9 @@ export class Game {
 export class Player {
   public authToken: string = "";
   public online: boolean = false;
+  public socket?: Socket;
+  public totalScore = 0;
+  public lastRoundScore = 0;
 
   constructor(
     public nickname: string,

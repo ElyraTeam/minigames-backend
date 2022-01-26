@@ -3,33 +3,37 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import * as errors from "./utils/errors";
 import cookieSession from "cookie-session";
+import helmet from "helmet";
+import hpp from "hpp";
+import cors from "cors";
+import morgan from "morgan";
 
 import wordRouter from "./routes/wordRoutes";
 import storage from "./storage";
 import { nanoid } from "nanoid";
+import { AuthenticateRequest } from "./models/socket";
 
 const app = express();
 const http = createServer(app);
 
-storage.io = new Server(http);
+const corsOptions = {
+  origin: "*",
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
+
+storage.io = new Server(http, {
+  cors: corsOptions,
+});
 
 const PORT = process.env.PORT || 3000;
-
-const helmet = require("helmet");
-const hpp = require("hpp");
-const cors = require("cors");
-const morgan = require("morgan");
 
 app.set("trust proxy", "loopback");
 app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(hpp());
-app.use(
-  cors({
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+app.use(cors(corsOptions));
 app.use(
   cookieSession({
     name: "session",
@@ -77,9 +81,37 @@ app.use(
 storage.io.on("connection", (socket) => {
   console.log("a user connected");
 
-  socket.on("authenticate", (data: any) => {
-    console.log(data);
-  });
+  socket.on(
+    "authenticate",
+    (data: AuthenticateRequest, ack?: (res: string) => void) => {
+      const game = storage.games.find((g) => g.id == data.roomId);
+      if (game) {
+        const player = game.getPlayerWithName(data.nickname);
+        if (player && player.authToken === data.authToken) {
+          socket.on("disconnect", () => {
+            player.online = false;
+            game.syncPlayers();
+          });
+
+          socket.on("chat", (msg) => {
+            storage.io.to(game.id).emit("chat", player.nickname, msg);
+          });
+
+          player.online = true;
+          socket.join(game.id);
+          game.sync();
+          game.syncOptions();
+          game.syncPlayers();
+          storage.saveGames();
+
+          //player.socket = socket;
+          if (ack) {
+            ack("good");
+          }
+        }
+      }
+    }
+  );
 });
 
 function loadData() {

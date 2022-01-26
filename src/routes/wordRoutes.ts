@@ -16,6 +16,7 @@ router.post("/room/create", (req, res) => {
   const game = new Game(roomId, body.nickname, body.options);
 
   storage.games.push(game);
+  storage.saveGames();
 
   return res.status(200).json({ roomId });
 });
@@ -51,6 +52,12 @@ router.post("/room/join/:roomId", (req, res) => {
     game.players.push(player);
   }
   player.authToken = nanoid();
+  player.owner = player.nickname === game.owner;
+
+  storage.saveGames();
+
+  game.sync();
+  game.syncPlayers();
 
   return res
     .status(200)
