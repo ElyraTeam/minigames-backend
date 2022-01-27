@@ -51,6 +51,8 @@ export class Game {
         nickname: p.nickname,
         online: p.online,
         owner: p.owner,
+        totalScore: p.totalScore,
+        lastRoundScore: p.lastRoundScore,
       })),
     });
   }

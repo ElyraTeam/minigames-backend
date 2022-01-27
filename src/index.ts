@@ -17,7 +17,9 @@ const app = express();
 const http = createServer(app);
 
 const corsOptions = {
-  origin: "*",
+  origin: (origin: any, callback: (err: any, origin?: any) => void) => {
+    callback(null, origin);
+  },
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
 };
