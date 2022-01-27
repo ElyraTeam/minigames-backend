@@ -3,3 +3,15 @@ export interface AuthenticateRequest {
   nickname: string;
   authToken: string;
 }
+
+export interface CategoryVoteData {
+  category: string;
+  values: Map<string, string>;
+  votes: Map<string, number>;
+}
+
+export interface ChatMessage {
+  type: "system" | "player";
+  sender: string;
+  message: string;
+}

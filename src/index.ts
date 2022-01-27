@@ -12,6 +12,7 @@ import wordRouter from "./routes/wordRoutes";
 import storage from "./storage";
 import { nanoid } from "nanoid";
 import { AuthenticateRequest } from "./models/socket";
+import { registerPlayerSocket } from "./games/word";
 
 const app = express();
 const http = createServer(app);
@@ -91,22 +92,25 @@ storage.io.on("connection", (socket) => {
         const player = game.getPlayerWithName(data.nickname);
         if (player && player.authToken === data.authToken) {
           socket.on("disconnect", () => {
+            player.socketId = undefined;
             player.online = false;
             game.syncPlayers();
           });
 
-          socket.on("chat", (msg) => {
-            storage.io.to(game.id).emit("chat", player.nickname, msg);
-          });
-
+          player.socketId = socket.id;
           player.online = true;
+
+          socket.data.nickname = player.nickname;
+          socket.data.sessionId = player.sessionId;
+
+          registerPlayerSocket(socket, game, player);
+
           socket.join(game.id);
+
           game.sync();
           game.syncOptions();
           game.syncPlayers();
           storage.saveGames();
-
-          //player.socket = socket;
           if (ack) {
             ack("good");
           }

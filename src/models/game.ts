@@ -1,5 +1,6 @@
 import { Socket } from "socket.io";
 import storage from "../storage";
+import { ChatMessage } from "./socket";
 
 export interface RoomOptions {
   rounds: number;
@@ -12,14 +13,26 @@ export enum State {
   LOBBY,
   VOTING,
   INGAME,
+  WAITING, //used in between rounds
+}
+
+export interface RoundData {
+  round: number;
+  stopClicker: string;
+  letter: string;
+  playerValues: Map<string, { [name: string]: string }>;
+  votes: Map<string, number>;
+  recievedVotes: string[];
 }
 
 export class Game {
   public players: Player[] = [];
-  public currentRound = 0;
+  public currentRound = 1;
   public currentLetter: string = "";
-  public currentCategory: string = "";
   public state: State = State.LOBBY;
+  private doneLetters: string[] = [];
+
+  public roundData: Map<number, RoundData> = new Map();
 
   constructor(
     public id: string,
@@ -33,7 +46,7 @@ export class Game {
       owner: this.owner,
       state: this.state,
       currentRound: this.currentRound,
-      currentCategory: this.currentCategory,
+      currentLetter: this.currentLetter,
     });
   }
 
@@ -57,6 +70,39 @@ export class Game {
     });
   }
 
+  kick(toKick: Player) {
+    if (toKick.socketId) {
+      toKick.getSocket()?.emit("kick", "You were kicked.");
+      toKick.getSocket()?.disconnect();
+    }
+  }
+
+  chat(sender: string, message: string) {
+    storage.io.to(this.id).emit("chat", {
+      type: sender === "system" ? "system" : "player",
+      sender,
+      message,
+    } as ChatMessage);
+  }
+
+  newRandomLetter() {
+    let letter =
+      this.options.letters[
+        Math.floor(Math.random() * this.options.letters.length)
+      ];
+    while (this.doneLetters.includes(letter)) {
+      letter =
+        this.options.letters[
+          Math.floor(Math.random() * this.options.letters.length)
+        ];
+    }
+    return letter;
+  }
+
+  toAllPlayers() {
+    return storage.io.to(this.id);
+  }
+
   isFull() {
     return this.players.length == this.options.maxPlayers;
   }
@@ -68,17 +114,28 @@ export class Game {
   getPlayerWithName(nickname: string) {
     return this.players.find((p) => p.nickname === nickname);
   }
+
+  removePlayer(nickname: string) {
+    this.players = this.players.filter((p) => p.nickname !== nickname);
+  }
 }
 export class Player {
-  public authToken: string = "";
+  public authToken?: string;
   public online: boolean = false;
-  public socket?: Socket;
   public totalScore = 0;
   public lastRoundScore = 0;
+  public socketId?: string;
 
   constructor(
     public nickname: string,
     public owner: boolean,
     public sessionId: string
   ) {}
+
+  getSocket() {
+    if (!this.socketId) {
+      return undefined;
+    }
+    return storage.io.sockets.sockets.get(this.socketId);
+  }
 }
