@@ -42,6 +42,7 @@ app.use(
     //TODO: move secret
     secret: "37n6bfuZy&5uoXjJkhcfvfjlghbgkjunli",
     sameSite: "none",
+    domain: "minigames-backend.herokuapp.com",
     maxAge: 604800000,
     secure: true,
     httpOnly: true,
