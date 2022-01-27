@@ -41,9 +41,9 @@ app.use(
     name: "session",
     //TODO: move secret
     secret: "37n6bfuZy&5uoXjJkhcfvfjlghbgkjunli",
-    sameSite: "lax",
+    sameSite: "none",
     maxAge: 604800000,
-    //secure: !dev,
+    secure: true,
     httpOnly: true,
   })
 );
