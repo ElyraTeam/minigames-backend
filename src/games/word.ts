@@ -27,8 +27,9 @@ export const registerPlayerSocket = (
           letter: game.currentLetter,
           stopClicker: "",
           playerValues: new Map(),
-          votes: new Map(),
+          finalPoints: new Map(),
           recievedVotes: [],
+          votes: new Map(),
         });
 
         game.sync();
@@ -69,13 +70,13 @@ export const registerPlayerSocket = (
                 plrData.set(key, categoryValue);
 
                 //TODO: calculate initial votes
-                roundData.votes.set(key, 0);
+                roundData.finalPoints.set(key, 0);
               });
 
               const categoryData = {
                 category,
                 values: plrData,
-                votes: roundData.votes,
+                votes: roundData.finalPoints,
               };
               game.toAllPlayers().emit("start-vote", categoryData);
             });
@@ -91,8 +92,36 @@ export const registerPlayerSocket = (
     const roundData = game.roundData.get(game.currentRound)!;
     roundData.recievedVotes.push(player.nickname);
 
+    //Cant vote for self lol
+    if (voteData.has(player.nickname)) {
+      voteData.delete(player.nickname);
+    }
+
+    voteData.forEach((val, key) => {
+      if (!roundData.votes.has(key)) {
+        roundData.votes.set(key, []);
+      }
+
+      if (val == 0 || val == 5 || val == 10) {
+        roundData.votes.get(key)!.push(val);
+      }
+    });
+
     if (roundData.recievedVotes.length === game.players.length) {
       //voting done, update final points and initiate new round
+
+      roundData.votes.forEach((v, nick) => {
+        let maj = 0;
+        if (v.length > 0) {
+          maj = findMajority(v);
+        }
+        const p = game.getPlayerWithName(nick);
+        if (p) {
+          p.totalScore += maj;
+          p.lastRoundScore = maj;
+        }
+      });
+
       game.state = State.LOBBY;
       game.currentLetter = "";
       game.currentRound++;
@@ -102,3 +131,32 @@ export const registerPlayerSocket = (
     }
   });
 };
+
+function findMajority(nums: number[]) {
+  let count = 0,
+    candidate = -1;
+
+  // Finding majority candidate
+  for (let index = 0; index < nums.length; index++) {
+    if (count == 0) {
+      candidate = nums[index];
+      count = 1;
+    } else {
+      if (nums[index] == candidate) count++;
+      else count--;
+    }
+  }
+
+  // Checking if majority candidate occurs more than
+  // n/2 times
+  for (let index = 0; index < nums.length; index++) {
+    if (nums[index] == candidate) count++;
+  }
+  if (count > nums.length / 2) return candidate;
+  return Math.max(...nums);
+
+  // The last for loop and the if statement step can
+  // be skip if a majority element is confirmed to
+  // be present in an array just return candidate
+  // in that case
+}

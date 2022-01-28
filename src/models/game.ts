@@ -21,8 +21,9 @@ export interface RoundData {
   stopClicker: string;
   letter: string;
   playerValues: Map<string, { [name: string]: string }>;
-  votes: Map<string, number>;
+  finalPoints: Map<string, number>;
   recievedVotes: string[];
+  votes: Map<string, number[]>;
 }
 
 export class Game {
@@ -31,6 +32,7 @@ export class Game {
   public currentLetter: string = "";
   public state: State = State.LOBBY;
   private doneLetters: string[] = [];
+  public kickedPlayerSessions: string[] = [];
 
   public roundData: Map<number, RoundData> = new Map();
 

@@ -1,11 +1,21 @@
 import express from "express";
 const router = express.Router();
-import { v4 as uuidv4 } from "uuid";
 
 import * as errors from "../utils/errors";
 import { nanoid } from "nanoid";
 import { Game, Player, RoomOptions, State } from "../models/game";
 import storage from "../storage";
+
+router.get("/room/debug/:roomId", (req, res) => {
+  const roomId = req.params.roomId;
+  const game = storage.games.find((g) => g.id == roomId);
+
+  if (!game) {
+    return res.status(404).json(errors.roomNotFound);
+  }
+
+  return res.status(200).json({ game });
+});
 
 router.post("/room/create", (req, res) => {
   const body = req.body as { nickname: string; options: RoomOptions };
@@ -38,6 +48,10 @@ router.post("/room/join/:roomId", (req, res) => {
   const foundPlayer = game.getPlayerWithName(nickname);
   if (foundPlayer && foundPlayer.sessionId != req.session!.id) {
     return res.status(403).json(errors.nicknameInUse);
+  }
+
+  if (game.kickedPlayerSessions.includes(req.session!.id!)) {
+    return res.status(403).json(errors.playerBanned);
   }
 
   let player: Player;
@@ -139,6 +153,7 @@ router.post("/room/kick/:roomId", (req, res) => {
 
   game.kick(toKick);
   game.removePlayer(toKick.nickname);
+  game.kickedPlayerSessions.push(toKick.sessionId);
   storage.saveGames();
 
   game.sync();
