@@ -14,7 +14,8 @@ router.get("/room/debug/:roomId", (req, res) => {
     return res.status(404).json(errors.roomNotFound);
   }
 
-  return res.status(200).json({ game });
+  res.header("Content-Type", "application/json");
+  return res.send(JSON.stringify(game, null, 2));
 });
 
 router.post("/room/create", (req, res) => {

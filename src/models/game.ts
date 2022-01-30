@@ -49,6 +49,7 @@ export class Game {
       state: this.state,
       currentRound: this.currentRound,
       currentLetter: this.currentLetter,
+      stopClicker: this.roundData.get(this.currentRound)?.stopClicker,
     });
   }
 
