@@ -110,6 +110,8 @@ storage.io.on("connection", (socket) => {
 
           if (game.state == State.VOTING) {
             socket.emit("start-vote", game.getCurrentCategoryVoteData());
+            game.updatePlayerVotes();
+            game.updateVoteCount();
           }
 
           game.sync();

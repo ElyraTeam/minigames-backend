@@ -76,6 +76,8 @@ router.post("/room/join/:roomId", (req, res) => {
   player.authToken = nanoid();
   player.owner = player.nickname === game.owner;
 
+  game.chat("system", `انضم ${player.nickname}.`);
+
   storage.saveGames();
 
   game.sync();
@@ -111,6 +113,8 @@ router.post("/room/leave/:roomId", (req, res) => {
       const newOwner = game.players[0];
       newOwner.owner = true;
       game.owner = newOwner.nickname;
+
+      game.chat("system", `اصبح ${game.owner} الاونر.`);
     }
   }
 

@@ -54,6 +54,7 @@ export const registerPlayerSocket = (
           finalPoints: {},
           recievedVotes: [],
           votes: {},
+          clientVotes: {},
         };
 
         game.sync();
@@ -68,12 +69,14 @@ export const registerPlayerSocket = (
     const roundData = game.roundData[game.currentRound]!;
     roundData.stopClicker = player.nickname;
 
+    game.doneLetters.push(game.currentLetter);
     game.stoppedAt = Date.now();
     game.state = State.WAITING;
     game.sync();
     storage.saveGames();
 
     game.players.forEach((p) => {
+      p.voted = false;
       p.lastRoundScore = 0;
       //Values is a map of category => value
       p.getSocket()?.emit(
@@ -113,16 +116,21 @@ export const registerPlayerSocket = (
     const roundData = game.roundData[game.currentRound]!;
     if (roundData.recievedVotes.includes(player.nickname)) return; //disallow revoting
 
+    player.voted = true;
     roundData.recievedVotes.push(player.nickname);
 
     const category = game.options.categories[game.currentVotingCategory];
 
     game.updateVoteCount();
+    game.chat("system", `صوت ${player.nickname}.`);
 
     //default vote 0 for all players
     game.players.forEach((p) => {
       if (!voteData[p.nickname]) {
         voteData[p.nickname] = 0;
+      }
+      if (!roundData.clientVotes[p.nickname]) {
+        roundData.clientVotes[p.nickname] = {};
       }
     });
 
@@ -131,9 +139,16 @@ export const registerPlayerSocket = (
       delete voteData[player.nickname];
     }
 
+    console.log(player.nickname, voteData);
+
     Object.entries(voteData).forEach(([playerToVoteFor, val]) => {
+      if (playerToVoteFor === player.nickname) return;
       if (!roundData.votes[playerToVoteFor]) {
-        roundData.votes[playerToVoteFor] = [];
+        roundData.votes[playerToVoteFor] = {};
+      }
+
+      if (!roundData.votes[playerToVoteFor][category]) {
+        roundData.votes[playerToVoteFor][category] = [];
       }
 
       //give 0 for empty values
@@ -144,14 +159,19 @@ export const registerPlayerSocket = (
       }
 
       if (val == 0 || val == 5 || val == 10) {
-        roundData.votes[playerToVoteFor]!.push(val);
+        roundData.votes[playerToVoteFor][category].push(val);
+
+        roundData.clientVotes[player.nickname][playerToVoteFor] = val;
       }
     });
+
+    game.updatePlayerVotes();
 
     if (roundData.recievedVotes.length === game.players.length) {
       //voting done, update final points and initiate new round
 
-      Object.entries(roundData.votes).forEach(([nick, v]) => {
+      Object.keys(roundData.votes).forEach((nick) => {
+        const v = roundData.votes[nick][category];
         let maj = 0;
         if (v.length > 0) {
           maj = findMajority(v);
@@ -165,10 +185,13 @@ export const registerPlayerSocket = (
 
       game.currentVotingCategory++;
 
-      if (game.currentVotingCategory == game.options.categories.length) {
-        roundData.recievedVotes = [];
-        game.updateVoteCount();
+      roundData.recievedVotes = [];
+      roundData.clientVotes = {};
+      game.players.forEach((p) => (p.voted = false));
+      game.updatePlayerVotes();
+      game.updateVoteCount();
 
+      if (game.currentVotingCategory == game.options.categories.length) {
         //if last round, send game over
         if (game.currentRound == game.options.rounds) {
           game.state = State.GAME_OVER;
@@ -179,13 +202,12 @@ export const registerPlayerSocket = (
 
         game.currentLetter = "";
         game.sync();
-        game.syncPlayers();
-        storage.saveGames();
       } else {
-        roundData.recievedVotes = [];
-        game.updateVoteCount();
         sendNextCategoryForVoting(game);
       }
+
+      game.syncPlayers();
+      storage.saveGames();
     }
   });
 };

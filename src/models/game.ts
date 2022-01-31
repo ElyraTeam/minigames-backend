@@ -18,6 +18,8 @@ export enum State {
 
 export type PlayerValues = { [name: string]: string };
 export type Points = { [name: string]: number };
+export type Votes = { [name: string]: number[] };
+export type ClientVotes = { [key: string]: { [k: string]: number } };
 
 export interface RoundData {
   round: number;
@@ -26,7 +28,8 @@ export interface RoundData {
   playerValues: { [name: string]: PlayerValues };
   finalPoints: Points;
   recievedVotes: string[];
-  votes: { [name: string]: number[] };
+  votes: { [name: string]: Votes };
+  clientVotes: ClientVotes;
 }
 
 export class Game {
@@ -35,7 +38,7 @@ export class Game {
   public currentLetter: string = "";
   public state: State = State.LOBBY;
   public currentVotingCategory: number = 0;
-  private doneLetters: string[] = [];
+  public doneLetters: string[] = [];
   public kickedPlayerSessions: string[] = [];
   public stoppedAt: number = 0;
 
@@ -115,6 +118,7 @@ export class Game {
         owner: p.owner,
         totalScore: p.totalScore,
         lastRoundScore: p.lastRoundScore,
+        voted: p.voted,
       })),
     });
   }
@@ -159,6 +163,13 @@ export class Game {
     );
   }
 
+  updatePlayerVotes() {
+    this.toAllPlayers().emit(
+      "player-votes",
+      this.roundData[this.currentRound]?.clientVotes ?? {}
+    );
+  }
+
   isFull() {
     return this.players.length == this.options.maxPlayers;
   }
@@ -181,6 +192,7 @@ export class Player {
   public totalScore = 0;
   public lastRoundScore = 0;
   public socketId?: string;
+  public voted: boolean = false;
 
   constructor(
     public nickname: string,
