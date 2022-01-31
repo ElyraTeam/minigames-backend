@@ -19,8 +19,26 @@ export const registerPlayerSocket = (
     game.chat(player.nickname, msg);
   });
 
+  //Allow reusing lobby after game is over
+  socket.on("reset-game", () => {
+    if (player.owner && game.state != State.INGAME) {
+      game.reset();
+
+      game.sync();
+      game.syncPlayers();
+      storage.saveGames();
+    }
+  });
+
   socket.on("start-game", () => {
-    if (player.owner && game.state == State.LOBBY) {
+    //Make sure 2 or more players are ingame
+    //Also make sure you are not above round limit
+    if (
+      player.owner &&
+      game.state == State.LOBBY &&
+      game.players.length >= 2 &&
+      game.currentRound <= game.options.rounds
+    ) {
       const letter = game.newRandomLetter();
       game.toAllPlayers().emit("start-timer", 3);
 
@@ -50,6 +68,7 @@ export const registerPlayerSocket = (
     const roundData = game.roundData[game.currentRound]!;
     roundData.stopClicker = player.nickname;
 
+    game.stoppedAt = Date.now();
     game.state = State.WAITING;
     game.sync();
     storage.saveGames();
@@ -59,8 +78,15 @@ export const registerPlayerSocket = (
       p.getSocket()?.emit(
         "request-values",
         (values: { [name: string]: string }) => {
-          //TODO: sanitize values
-          roundData.playerValues[p.nickname] = values;
+          //Check if send window is open
+          if (Date.now() <= game.stoppedAt + 5000) {
+            game.options.categories.forEach((cat) => {
+              if (!values[cat]) {
+                values[cat] = "";
+              }
+            });
+            roundData.playerValues[p.nickname] = values;
+          }
 
           //Check if every player sent their data
           if (
@@ -90,9 +116,14 @@ export const registerPlayerSocket = (
 
     const category = game.options.categories[game.currentVotingCategory];
 
-    game
-      .toAllPlayers()
-      .emit("update-vote-count", roundData.recievedVotes.length);
+    game.updateVoteCount();
+
+    //default vote 0 for all players
+    game.players.forEach((p) => {
+      if (!voteData[p.nickname]) {
+        voteData[p.nickname] = 0;
+      }
+    });
 
     //Cant vote for self lol
     if (voteData[player.nickname]) {
@@ -137,9 +168,15 @@ export const registerPlayerSocket = (
         roundData.recievedVotes = [];
         game.updateVoteCount();
 
-        game.state = State.LOBBY;
+        //if last round, send game over
+        if (game.currentRound == game.options.rounds) {
+          game.state = State.GAME_OVER;
+        } else {
+          game.state = State.LOBBY;
+          game.currentRound++;
+        }
+
         game.currentLetter = "";
-        game.currentRound++;
         game.sync();
         game.syncPlayers();
         storage.saveGames();

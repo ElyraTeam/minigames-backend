@@ -21,7 +21,14 @@ router.get("/room/debug/:roomId", (req, res) => {
 router.post("/room/create", (req, res) => {
   const body = req.body as { nickname: string; options: RoomOptions };
 
-  //TODO: validate body
+  if (
+    body.options.categories.length == 0 ||
+    body.options.letters.length == 0 ||
+    body.options.maxPlayers < 2 ||
+    body.options.rounds < 1
+  ) {
+    return res.status(403).json(errors.invalidRoomOptions);
+  }
 
   const roomId = nanoid(8);
   const game = new Game(roomId, body.nickname, body.options);
@@ -116,7 +123,7 @@ router.post("/room/leave/:roomId", (req, res) => {
   game.sync();
   game.syncPlayers();
 
-  game.chat("system", foundPlayer.nickname + " left.");
+  game.chat("system", `خرج ${foundPlayer.nickname}.`);
 
   return res.status(204).end();
 });
@@ -160,7 +167,7 @@ router.post("/room/kick/:roomId", (req, res) => {
   game.sync();
   game.syncPlayers();
 
-  game.chat("system", toKick.nickname + " was kicked.");
+  game.chat("system", `تم طرد ${toKick.nickname}.`);
 
   return res.status(204).end();
 });

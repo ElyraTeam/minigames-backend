@@ -1,4 +1,3 @@
-import { Socket } from "socket.io";
 import storage from "../storage";
 import { ChatMessage } from "./socket";
 
@@ -13,7 +12,8 @@ export enum State {
   LOBBY,
   VOTING,
   INGAME,
-  WAITING, //used in between rounds
+  WAITING, //used after someone stopped
+  GAME_OVER,
 }
 
 export type PlayerValues = { [name: string]: string };
@@ -37,6 +37,7 @@ export class Game {
   public currentVotingCategory: number = 0;
   private doneLetters: string[] = [];
   public kickedPlayerSessions: string[] = [];
+  public stoppedAt: number = 0;
 
   public roundData: { [key: number]: RoundData | undefined } = {};
 
@@ -53,6 +54,16 @@ export class Game {
         value instanceof Map ? Object.fromEntries(value) : value,
       2
     );
+  }
+
+  reset() {
+    this.state = State.LOBBY;
+    this.currentLetter = "";
+    this.doneLetters = [];
+    this.roundData = {};
+    this.currentVotingCategory = 0;
+    this.currentRound = 1;
+    this.stoppedAt = 0;
   }
 
   sync() {
@@ -88,7 +99,7 @@ export class Game {
 
   kick(toKick: Player) {
     if (toKick.socketId) {
-      toKick.getSocket()?.emit("kick", "You were kicked.");
+      toKick.getSocket()?.emit("kick", "تم طردك من الغرفة.");
       toKick.getSocket()?.disconnect();
     }
   }

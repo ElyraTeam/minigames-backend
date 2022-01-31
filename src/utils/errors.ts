@@ -11,5 +11,6 @@ export const unknownPlayer = error(1004, "Player not found.");
 export const noPermission = error(1005, "No permission.");
 export const cantKick = error(1006, "Cannot kick owner or self.");
 export const playerBanned = error(1007, "You can't join this game.");
+export const invalidRoomOptions = error(1008, "Invalid room options.");
 
 export const unexpectedError = error(1010, "Unexpected error.");
