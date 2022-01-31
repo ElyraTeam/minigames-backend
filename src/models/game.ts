@@ -16,14 +16,17 @@ export enum State {
   WAITING, //used in between rounds
 }
 
+export type PlayerValues = { [name: string]: string };
+export type Points = { [name: string]: number };
+
 export interface RoundData {
   round: number;
   stopClicker: string;
   letter: string;
-  playerValues: Map<string, { [name: string]: string }>;
-  finalPoints: Map<string, number>;
+  playerValues: { [name: string]: PlayerValues };
+  finalPoints: Points;
   recievedVotes: string[];
-  votes: Map<string, number[]>;
+  votes: { [name: string]: number[] };
 }
 
 export class Game {
@@ -31,16 +34,26 @@ export class Game {
   public currentRound = 1;
   public currentLetter: string = "";
   public state: State = State.LOBBY;
+  public currentVotingCategory: number = 0;
   private doneLetters: string[] = [];
   public kickedPlayerSessions: string[] = [];
 
-  public roundData: Map<number, RoundData> = new Map();
+  public roundData: { [key: number]: RoundData | undefined } = {};
 
   constructor(
     public id: string,
     public owner: string,
     public options: RoomOptions
   ) {}
+
+  toJson() {
+    return JSON.stringify(
+      this,
+      (key, value) =>
+        value instanceof Map ? Object.fromEntries(value) : value,
+      2
+    );
+  }
 
   sync() {
     storage.io.to(this.id).emit("sync", {
@@ -49,7 +62,7 @@ export class Game {
       state: this.state,
       currentRound: this.currentRound,
       currentLetter: this.currentLetter,
-      stopClicker: this.roundData.get(this.currentRound)?.stopClicker,
+      stopClicker: this.roundData[this.currentRound]?.stopClicker,
     });
   }
 
@@ -104,6 +117,13 @@ export class Game {
 
   toAllPlayers() {
     return storage.io.to(this.id);
+  }
+
+  updateVoteCount() {
+    this.toAllPlayers().emit(
+      "update-vote-count",
+      this.roundData[this.currentRound]?.recievedVotes.length ?? 0
+    );
   }
 
   isFull() {

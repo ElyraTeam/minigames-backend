@@ -1,6 +1,13 @@
 import { Socket } from "socket.io";
 import { stringify } from "uuid";
-import { Game, Player, State } from "../models/game";
+import {
+  Game,
+  Player,
+  PlayerValues,
+  Points,
+  RoundData,
+  State,
+} from "../models/game";
 import storage from "../storage";
 
 export const registerPlayerSocket = (
@@ -13,7 +20,6 @@ export const registerPlayerSocket = (
   });
 
   socket.on("start-game", () => {
-    console.log(player.owner, game.state);
     if (player.owner && game.state == State.LOBBY) {
       const letter = game.newRandomLetter();
       game.toAllPlayers().emit("start-timer", 3);
@@ -22,15 +28,15 @@ export const registerPlayerSocket = (
         game.currentLetter = letter;
         game.state = State.INGAME;
 
-        game.roundData.set(game.currentRound, {
+        game.roundData[game.currentRound] = {
           round: game.currentRound,
           letter: game.currentLetter,
           stopClicker: "",
-          playerValues: new Map(),
-          finalPoints: new Map(),
+          playerValues: {},
+          finalPoints: {},
           recievedVotes: [],
-          votes: new Map(),
-        });
+          votes: {},
+        };
 
         game.sync();
         storage.saveGames();
@@ -41,7 +47,7 @@ export const registerPlayerSocket = (
   socket.on("stop-game", () => {
     if (game.state != State.INGAME) return;
 
-    const roundData = game.roundData.get(game.currentRound)!;
+    const roundData = game.roundData[game.currentRound]!;
     roundData.stopClicker = player.nickname;
 
     game.state = State.WAITING;
@@ -54,63 +60,66 @@ export const registerPlayerSocket = (
         "request-values",
         (values: { [name: string]: string }) => {
           //TODO: sanitize values
-          roundData.playerValues.set(p.nickname, values);
+          roundData.playerValues[p.nickname] = values;
 
           //Check if every player sent their data
-          if (roundData.playerValues.size === game.players.length) {
+          if (
+            Object.entries(roundData.playerValues).length ===
+            game.players.length
+          ) {
             //Start voting process
+            game.currentVotingCategory = 0;
             game.state = State.VOTING;
             game.sync();
             storage.saveGames();
 
-            game.options.categories.forEach((category) => {
-              let plrData: Map<string, string> = new Map();
-              roundData.playerValues.forEach((val, key) => {
-                const categoryValue = val[category];
-                plrData.set(key, categoryValue);
-
-                //TODO: calculate initial votes
-                roundData.finalPoints.set(key, 0);
-              });
-
-              const categoryData = {
-                category,
-                values: plrData,
-                votes: roundData.finalPoints,
-              };
-              game.toAllPlayers().emit("start-vote", categoryData);
-            });
+            sendNextCategoryForVoting(game, roundData);
           }
         }
       );
     });
   });
 
-  socket.on("vote", (voteData: Map<string, number>) => {
+  socket.on("vote", (voteData: Points) => {
     if (game.state != State.VOTING) return;
     //Someone voted
-    const roundData = game.roundData.get(game.currentRound)!;
+    const roundData = game.roundData[game.currentRound]!;
+    if (roundData.recievedVotes.includes(player.nickname)) return; //disallow revoting
+
     roundData.recievedVotes.push(player.nickname);
 
+    const category = game.options.categories[game.currentVotingCategory];
+
+    game
+      .toAllPlayers()
+      .emit("update-vote-count", roundData.recievedVotes.length);
+
     //Cant vote for self lol
-    if (voteData.has(player.nickname)) {
-      voteData.delete(player.nickname);
+    if (voteData[player.nickname]) {
+      delete voteData[player.nickname];
     }
 
-    voteData.forEach((val, key) => {
-      if (!roundData.votes.has(key)) {
-        roundData.votes.set(key, []);
+    Object.entries(voteData).forEach(([playerToVoteFor, val]) => {
+      if (!roundData.votes[playerToVoteFor]) {
+        roundData.votes[playerToVoteFor] = [];
+      }
+
+      //give 0 for empty values
+      const playerVals = roundData.playerValues[playerToVoteFor]!;
+      const playerCategoryVal = playerVals[category];
+      if (!playerCategoryVal || playerCategoryVal == "") {
+        val = 0;
       }
 
       if (val == 0 || val == 5 || val == 10) {
-        roundData.votes.get(key)!.push(val);
+        roundData.votes[playerToVoteFor]!.push(val);
       }
     });
 
     if (roundData.recievedVotes.length === game.players.length) {
       //voting done, update final points and initiate new round
 
-      roundData.votes.forEach((v, nick) => {
+      Object.entries(roundData.votes).forEach(([nick, v]) => {
         let maj = 0;
         if (v.length > 0) {
           maj = findMajority(v);
@@ -122,15 +131,47 @@ export const registerPlayerSocket = (
         }
       });
 
-      game.state = State.LOBBY;
-      game.currentLetter = "";
-      game.currentRound++;
-      game.sync();
-      game.syncPlayers();
-      storage.saveGames();
+      game.currentVotingCategory++;
+
+      if (game.currentVotingCategory == game.options.categories.length) {
+        roundData.recievedVotes = [];
+        game.updateVoteCount();
+
+        game.state = State.LOBBY;
+        game.currentLetter = "";
+        game.currentRound++;
+        game.sync();
+        game.syncPlayers();
+        storage.saveGames();
+      } else {
+        roundData.recievedVotes = [];
+        game.updateVoteCount();
+        sendNextCategoryForVoting(game, roundData);
+      }
     }
   });
 };
+
+function sendNextCategoryForVoting(game: Game, roundData: RoundData) {
+  const category = game.options.categories[game.currentVotingCategory];
+
+  let plrData: PlayerValues = {};
+  Object.entries(roundData.playerValues).forEach(([key, val]) => {
+    const categoryValue = val[category];
+    plrData[key] = categoryValue;
+
+    //TODO: calculate initial votes
+    roundData.finalPoints[key] = 0;
+  });
+
+  //send first category
+  const categoryData = {
+    category,
+    values: plrData,
+    votes: roundData.finalPoints,
+  };
+  game.toAllPlayers().emit("start-vote", categoryData);
+}
 
 function findMajority(nums: number[]) {
   let count = 0,

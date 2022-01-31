@@ -15,7 +15,7 @@ router.get("/room/debug/:roomId", (req, res) => {
   }
 
   res.header("Content-Type", "application/json");
-  return res.send(JSON.stringify(game, null, 2));
+  return res.send(game.toJson());
 });
 
 router.post("/room/create", (req, res) => {
