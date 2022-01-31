@@ -66,6 +66,28 @@ export class Game {
     this.stoppedAt = 0;
   }
 
+  getCurrentCategoryVoteData() {
+    const category = this.options.categories[this.currentVotingCategory];
+    const roundData = this.roundData[this.currentRound]!;
+
+    let plrData: PlayerValues = {};
+    Object.entries(roundData.playerValues).forEach(([key, val]) => {
+      const categoryValue = val[category];
+      plrData[key] = categoryValue;
+
+      //TODO: calculate initial votes
+      roundData.finalPoints[key] = 0;
+    });
+
+    //send first category
+    const categoryData = {
+      category,
+      values: plrData,
+      votes: roundData.finalPoints,
+    };
+    return categoryData;
+  }
+
   sync() {
     storage.io.to(this.id).emit("sync", {
       id: this.id,

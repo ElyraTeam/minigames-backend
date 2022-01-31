@@ -13,6 +13,7 @@ import storage from "./storage";
 import { nanoid } from "nanoid";
 import { AuthenticateRequest } from "./models/socket";
 import { registerPlayerSocket } from "./games/word";
+import { State } from "./models/game";
 
 const app = express();
 const http = createServer(app);
@@ -106,6 +107,10 @@ storage.io.on("connection", (socket) => {
           registerPlayerSocket(socket, game, player);
 
           socket.join(game.id);
+
+          if (game.state == State.VOTING) {
+            socket.emit("start-vote", game.getCurrentCategoryVoteData());
+          }
 
           game.sync();
           game.syncOptions();

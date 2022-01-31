@@ -74,6 +74,7 @@ export const registerPlayerSocket = (
     storage.saveGames();
 
     game.players.forEach((p) => {
+      p.lastRoundScore = 0;
       //Values is a map of category => value
       p.getSocket()?.emit(
         "request-values",
@@ -99,7 +100,7 @@ export const registerPlayerSocket = (
             game.sync();
             storage.saveGames();
 
-            sendNextCategoryForVoting(game, roundData);
+            sendNextCategoryForVoting(game);
           }
         }
       );
@@ -158,7 +159,7 @@ export const registerPlayerSocket = (
         const p = game.getPlayerWithName(nick);
         if (p) {
           p.totalScore += maj;
-          p.lastRoundScore = maj;
+          p.lastRoundScore += maj;
         }
       });
 
@@ -183,31 +184,14 @@ export const registerPlayerSocket = (
       } else {
         roundData.recievedVotes = [];
         game.updateVoteCount();
-        sendNextCategoryForVoting(game, roundData);
+        sendNextCategoryForVoting(game);
       }
     }
   });
 };
 
-function sendNextCategoryForVoting(game: Game, roundData: RoundData) {
-  const category = game.options.categories[game.currentVotingCategory];
-
-  let plrData: PlayerValues = {};
-  Object.entries(roundData.playerValues).forEach(([key, val]) => {
-    const categoryValue = val[category];
-    plrData[key] = categoryValue;
-
-    //TODO: calculate initial votes
-    roundData.finalPoints[key] = 0;
-  });
-
-  //send first category
-  const categoryData = {
-    category,
-    values: plrData,
-    votes: roundData.finalPoints,
-  };
-  game.toAllPlayers().emit("start-vote", categoryData);
+function sendNextCategoryForVoting(game: Game) {
+  game.toAllPlayers().emit("start-vote", game.getCurrentCategoryVoteData());
 }
 
 function findMajority(nums: number[]) {
