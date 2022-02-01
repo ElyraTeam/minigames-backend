@@ -198,6 +198,16 @@ router.post("/room/options/:roomId", (req, res) => {
     return res.status(403).json(errors.noPermission);
   }
 
+  if (
+    options.maxPlayers < game.players.length ||
+    options.categories.length == 0 ||
+    options.letters.length == 0 ||
+    options.maxPlayers < 2 ||
+    options.rounds < 1
+  ) {
+    return res.status(403).json(errors.invalidRoomOptions);
+  }
+
   game.options = options;
 
   storage.saveGames();

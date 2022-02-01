@@ -21,7 +21,10 @@ export const registerPlayerSocket = (
 
   //Allow reusing lobby after game is over
   socket.on("reset-game", () => {
-    if (player.owner && game.state != State.INGAME) {
+    if (
+      (player.owner && game.state == State.GAME_OVER) ||
+      game.state == State.LOBBY
+    ) {
       game.reset();
 
       game.sync();
@@ -52,7 +55,7 @@ export const registerPlayerSocket = (
           stopClicker: "",
           playerValues: {},
           finalPoints: {},
-          recievedVotes: [],
+          confirmedVotes: [],
           votes: {},
           clientVotes: {},
         };
@@ -111,18 +114,8 @@ export const registerPlayerSocket = (
   });
 
   socket.on("vote", (voteData: Points) => {
-    if (game.state != State.VOTING) return;
-    //Someone voted
-    const roundData = game.roundData[game.currentRound]!;
-    if (roundData.recievedVotes.includes(player.nickname)) return; //disallow revoting
-
-    player.voted = true;
-    roundData.recievedVotes.push(player.nickname);
-
     const category = game.options.categories[game.currentVotingCategory];
-
-    game.updateVoteCount();
-    game.chat("system", `صوت ${player.nickname}.`);
+    const roundData = game.roundData[game.currentRound]!;
 
     //default vote 0 for all players
     game.players.forEach((p) => {
@@ -139,35 +132,51 @@ export const registerPlayerSocket = (
       delete voteData[player.nickname];
     }
 
-    console.log(player.nickname, voteData);
-
     Object.entries(voteData).forEach(([playerToVoteFor, val]) => {
-      if (playerToVoteFor === player.nickname) return;
-      if (!roundData.votes[playerToVoteFor]) {
-        roundData.votes[playerToVoteFor] = {};
-      }
+      if (playerToVoteFor !== player.nickname) {
+        if (!roundData.votes[playerToVoteFor]) {
+          roundData.votes[playerToVoteFor] = {};
+        }
 
-      if (!roundData.votes[playerToVoteFor][category]) {
-        roundData.votes[playerToVoteFor][category] = [];
-      }
+        if (!roundData.votes[playerToVoteFor][category]) {
+          roundData.votes[playerToVoteFor][category] = [];
+        }
 
-      //give 0 for empty values
-      const playerVals = roundData.playerValues[playerToVoteFor]!;
-      const playerCategoryVal = playerVals[category];
-      if (!playerCategoryVal || playerCategoryVal == "") {
-        val = 0;
-      }
+        //give 0 for empty values
+        const playerVals = roundData.playerValues[playerToVoteFor]!;
+        const playerCategoryVal = playerVals[category];
+        if (!playerCategoryVal || playerCategoryVal == "") {
+          val = 0;
+        }
 
-      if (val == 0 || val == 5 || val == 10) {
-        roundData.votes[playerToVoteFor][category].push(val);
+        if (val == 0 || val == 5 || val == 10) {
+          roundData.votes[playerToVoteFor][category].push(val);
 
-        roundData.clientVotes[player.nickname][playerToVoteFor] = val;
+          roundData.clientVotes[player.nickname][playerToVoteFor] = val;
+        }
       }
     });
+    game.updatePlayerVotes();
+    game.syncPlayers();
+    storage.saveGames();
+  });
+
+  socket.on("confirm-vote", () => {
+    if (game.state != State.VOTING) return;
+    //Someone voted
+    const category = game.options.categories[game.currentVotingCategory];
+    const roundData = game.roundData[game.currentRound]!;
+    if (roundData.confirmedVotes.includes(player.nickname)) return; //disallow revoting
+
+    player.voted = true;
+    roundData.confirmedVotes.push(player.nickname);
+
+    game.updateVoteCount();
+    game.chat("system", `صوت ${player.nickname}.`);
 
     game.updatePlayerVotes();
 
-    if (roundData.recievedVotes.length === game.players.length) {
+    if (roundData.confirmedVotes.length === game.players.length) {
       //voting done, update final points and initiate new round
 
       Object.keys(roundData.votes).forEach((nick) => {
@@ -185,7 +194,7 @@ export const registerPlayerSocket = (
 
       game.currentVotingCategory++;
 
-      roundData.recievedVotes = [];
+      roundData.confirmedVotes = [];
       roundData.clientVotes = {};
       game.players.forEach((p) => (p.voted = false));
       game.updatePlayerVotes();

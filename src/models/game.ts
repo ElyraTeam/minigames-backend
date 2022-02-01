@@ -27,7 +27,11 @@ export interface RoundData {
   letter: string;
   playerValues: { [name: string]: PlayerValues };
   finalPoints: Points;
-  recievedVotes: string[];
+  confirmedVotes: string[];
+
+  /**
+   * Final Votes
+   */
   votes: { [name: string]: Votes };
   clientVotes: ClientVotes;
 }
@@ -67,6 +71,11 @@ export class Game {
     this.currentVotingCategory = 0;
     this.currentRound = 1;
     this.stoppedAt = 0;
+    this.players.forEach((p) => {
+      p.totalScore = 0;
+      p.voted = false;
+      p.lastRoundScore = 0;
+    });
   }
 
   getCurrentCategoryVoteData() {
@@ -87,6 +96,7 @@ export class Game {
       category,
       values: plrData,
       votes: roundData.finalPoints,
+      categoryIndex: this.currentVotingCategory,
     };
     return categoryData;
   }
@@ -159,7 +169,7 @@ export class Game {
   updateVoteCount() {
     this.toAllPlayers().emit(
       "update-vote-count",
-      this.roundData[this.currentRound]?.recievedVotes.length ?? 0
+      this.roundData[this.currentRound]?.confirmedVotes.length ?? 0
     );
   }
 
