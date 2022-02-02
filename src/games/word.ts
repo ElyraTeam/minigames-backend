@@ -102,11 +102,12 @@ export const registerPlayerSocket = (
           ) {
             //Start voting process
             game.currentVotingCategory = 0;
+            game.prepareNewCategoryVoting();
             game.state = State.VOTING;
             game.sync();
             storage.saveGames();
 
-            sendNextCategoryForVoting(game);
+            game.sendNextCategoryForVoting();
           }
         }
       );
@@ -134,14 +135,6 @@ export const registerPlayerSocket = (
 
     Object.entries(voteData).forEach(([playerToVoteFor, val]) => {
       if (playerToVoteFor !== player.nickname) {
-        if (!roundData.votes[playerToVoteFor]) {
-          roundData.votes[playerToVoteFor] = {};
-        }
-
-        if (!roundData.votes[playerToVoteFor][category]) {
-          roundData.votes[playerToVoteFor][category] = [];
-        }
-
         //give 0 for empty values
         const playerVals = roundData.playerValues[playerToVoteFor]!;
         const playerCategoryVal = playerVals[category];
@@ -150,8 +143,6 @@ export const registerPlayerSocket = (
         }
 
         if (val == 0 || val == 5 || val == 10) {
-          roundData.votes[playerToVoteFor][category].push(val);
-
           roundData.clientVotes[player.nickname][playerToVoteFor] = val;
         }
       }
@@ -171,85 +162,33 @@ export const registerPlayerSocket = (
     player.voted = true;
     roundData.confirmedVotes.push(player.nickname);
 
+    //get his final client votes and start adding
+    if (roundData.clientVotes[player.nickname]) {
+      const playerVotes = roundData.clientVotes[player.nickname];
+      Object.keys(playerVotes).forEach((playerToVoteFor) => {
+        if (playerToVoteFor !== player.nickname) {
+          if (!roundData.votes[playerToVoteFor]) {
+            roundData.votes[playerToVoteFor] = {};
+          }
+
+          if (!roundData.votes[playerToVoteFor][category]) {
+            roundData.votes[playerToVoteFor][category] = [];
+          }
+
+          roundData.votes[playerToVoteFor][category].push(
+            playerVotes[playerToVoteFor]
+          );
+        }
+      });
+    }
+
     game.updateVoteCount();
     game.chat("system", `صوت ${player.nickname}.`);
 
     game.updatePlayerVotes();
 
-    if (roundData.confirmedVotes.length === game.players.length) {
-      //voting done, update final points and initiate new round
+    game.checkEveryoneVoted();
 
-      Object.keys(roundData.votes).forEach((nick) => {
-        const v = roundData.votes[nick][category];
-        let maj = 0;
-        if (v.length > 0) {
-          maj = findMajority(v);
-        }
-        const p = game.getPlayerWithName(nick);
-        if (p) {
-          p.totalScore += maj;
-          p.lastRoundScore += maj;
-        }
-      });
-
-      game.currentVotingCategory++;
-
-      roundData.confirmedVotes = [];
-      roundData.clientVotes = {};
-      game.players.forEach((p) => (p.voted = false));
-      game.updatePlayerVotes();
-      game.updateVoteCount();
-
-      if (game.currentVotingCategory == game.options.categories.length) {
-        //if last round, send game over
-        if (game.currentRound == game.options.rounds) {
-          game.state = State.GAME_OVER;
-        } else {
-          game.state = State.LOBBY;
-          game.currentRound++;
-        }
-
-        game.currentLetter = "";
-        game.sync();
-      } else {
-        sendNextCategoryForVoting(game);
-      }
-
-      game.syncPlayers();
-      storage.saveGames();
-    }
+    storage.saveGames();
   });
 };
-
-function sendNextCategoryForVoting(game: Game) {
-  game.toAllPlayers().emit("start-vote", game.getCurrentCategoryVoteData());
-}
-
-function findMajority(nums: number[]) {
-  let count = 0,
-    candidate = -1;
-
-  // Finding majority candidate
-  for (let index = 0; index < nums.length; index++) {
-    if (count == 0) {
-      candidate = nums[index];
-      count = 1;
-    } else {
-      if (nums[index] == candidate) count++;
-      else count--;
-    }
-  }
-
-  // Checking if majority candidate occurs more than
-  // n/2 times
-  for (let index = 0; index < nums.length; index++) {
-    if (nums[index] == candidate) count++;
-  }
-  if (count > nums.length / 2) return candidate;
-  return Math.max(...nums);
-
-  // The last for loop and the if statement step can
-  // be skip if a majority element is confirmed to
-  // be present in an array just return candidate
-  // in that case
-}

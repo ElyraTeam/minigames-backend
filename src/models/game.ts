@@ -1,4 +1,5 @@
 import storage from "../storage";
+import { findMajority } from "../utils/utils";
 import { ChatMessage } from "./socket";
 
 export interface RoomOptions {
@@ -101,6 +102,71 @@ export class Game {
     return categoryData;
   }
 
+  prepareNewCategoryVoting() {
+    const newCategory = this.options.categories[this.currentVotingCategory];
+    const roundData = this.roundData[this.currentRound]!;
+
+    roundData.confirmedVotes = [];
+    roundData.clientVotes = {};
+    this.players.forEach((p) => {
+      p.voted = false;
+      if (!roundData.votes[p.nickname]) {
+        roundData.votes[p.nickname] = {};
+      }
+
+      if (!roundData.votes[p.nickname][newCategory]) {
+        roundData.votes[p.nickname][newCategory] = [];
+      }
+    });
+  }
+
+  checkEveryoneVoted() {
+    const roundData = this.roundData[this.currentRound]!;
+    const category = this.options.categories[this.currentVotingCategory];
+    if (roundData.confirmedVotes.length === this.players.length) {
+      //voting done, update final points and initiate new round
+
+      Object.keys(roundData.votes).forEach((nick) => {
+        const v = roundData.votes[nick][category];
+        let maj = 0;
+        if (v.length > 0) {
+          maj = findMajority(v);
+        }
+        const p = this.getPlayerWithName(nick);
+        if (p) {
+          p.totalScore += maj;
+          p.lastRoundScore += maj;
+        }
+      });
+
+      this.currentVotingCategory++;
+      this.prepareNewCategoryVoting();
+      this.updatePlayerVotes();
+      this.updateVoteCount();
+
+      if (this.currentVotingCategory == this.options.categories.length) {
+        //if last round, send game over
+        if (this.currentRound == this.options.rounds) {
+          this.state = State.GAME_OVER;
+        } else {
+          this.state = State.LOBBY;
+          this.currentRound++;
+        }
+
+        this.currentLetter = "";
+        this.sync();
+      } else {
+        this.sendNextCategoryForVoting();
+      }
+
+      this.syncPlayers();
+    }
+  }
+
+  sendNextCategoryForVoting() {
+    this.toAllPlayers().emit("start-vote", this.getCurrentCategoryVoteData());
+  }
+
   sync() {
     storage.io.to(this.id).emit("sync", {
       id: this.id,
@@ -193,6 +259,28 @@ export class Game {
   }
 
   removePlayer(nickname: string) {
+    const roundData = this.roundData[this.currentRound];
+    if (roundData) {
+      if (roundData.clientVotes[nickname]) {
+        delete roundData.clientVotes[nickname];
+      }
+
+      if (roundData.confirmedVotes.includes(nickname)) {
+        roundData.confirmedVotes = roundData.confirmedVotes.filter(
+          (n) => n !== nickname
+        );
+      }
+
+      if (roundData.votes[nickname]) {
+        delete roundData.votes[nickname];
+      }
+    }
+
+    if (this.state == State.VOTING) {
+      this.updateVoteCount();
+      this.updatePlayerVotes();
+    }
+
     this.players = this.players.filter((p) => p.nickname !== nickname);
   }
 }

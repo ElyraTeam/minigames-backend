@@ -118,6 +118,8 @@ router.post("/room/leave/:roomId", (req, res) => {
     }
   }
 
+  game.checkEveryoneVoted();
+
   storage.saveGames();
 
   if (foundPlayer.socketId) {
