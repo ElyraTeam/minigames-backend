@@ -7,6 +7,8 @@ import helmet from "helmet";
 import hpp from "hpp";
 import cors from "cors";
 import morgan from "morgan";
+import * as Sentry from "@sentry/node";
+import * as Tracing from "@sentry/tracing";
 
 import wordRouter from "./routes/wordRoutes";
 import storage from "./storage";
@@ -17,6 +19,16 @@ import { State } from "./models/game";
 
 const app = express();
 const http = createServer(app);
+
+Sentry.init({
+  dsn: "https://9bdafc7f662f41f5bc0c846024ec92f4@o260487.ingest.sentry.io/6179839",
+  integrations: [
+    new Sentry.Integrations.Http({ tracing: true }),
+    new Tracing.Integrations.Express({ app }),
+  ],
+
+  tracesSampleRate: 1.0,
+});
 
 const corsOptions = {
   origin: (origin: any, callback: (err: any, origin?: any) => void) => {
@@ -63,12 +75,18 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(Sentry.Handlers.requestHandler());
+// TracingHandler creates a trace for every incoming request
+app.use(Sentry.Handlers.tracingHandler());
+
 app.get("/", (req, res) => {
   res.status(200).send("All good!");
 });
 
 app.use("/assets", express.static("./static"));
 app.use("/word", wordRouter);
+
+app.use(Sentry.Handlers.errorHandler());
 
 app.use(
   (
@@ -78,7 +96,9 @@ app.use(
     next: NextFunction
   ) => {
     console.error(err.stack);
-    res.status(500).json(errors.unexpectedError);
+    res
+      .status(500)
+      .json({ ...errors.unexpectedError, id: (res as any).sentry });
   }
 );
 
