@@ -103,8 +103,6 @@ app.use(
 );
 
 storage.io.on("connection", (socket) => {
-  console.log("a user connected");
-
   socket.on(
     "authenticate",
     (data: AuthenticateRequest, ack?: (res: string) => void) => {

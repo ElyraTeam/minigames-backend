@@ -21,10 +21,7 @@ export const registerPlayerSocket = (
 
   //Allow reusing lobby after game is over
   socket.on("reset-game", () => {
-    if (
-      (player.owner && game.state == State.GAME_OVER) ||
-      game.state == State.LOBBY
-    ) {
+    if (player.owner) {
       game.reset();
 
       game.sync();
@@ -69,7 +66,9 @@ export const registerPlayerSocket = (
   socket.on("stop-game", () => {
     if (game.state != State.INGAME) return;
 
-    const roundData = game.roundData[game.currentRound]!;
+    const roundData = game.roundData[game.currentRound];
+    if (!roundData) return;
+
     roundData.stopClicker = player.nickname;
 
     game.doneLetters.push(game.currentLetter);
@@ -116,13 +115,10 @@ export const registerPlayerSocket = (
 
   socket.on("vote", (voteData: Points) => {
     const category = game.options.categories[game.currentVotingCategory];
-    const roundData = game.roundData[game.currentRound]!;
+    const roundData = game.roundData[game.currentRound];
+    if (!roundData) return;
 
-    //default vote 0 for all players
     game.players.forEach((p) => {
-      if (!voteData[p.nickname]) {
-        voteData[p.nickname] = 0;
-      }
       if (!roundData.clientVotes[p.nickname]) {
         roundData.clientVotes[p.nickname] = {};
       }
@@ -156,7 +152,8 @@ export const registerPlayerSocket = (
     if (game.state != State.VOTING) return;
     //Someone voted
     const category = game.options.categories[game.currentVotingCategory];
-    const roundData = game.roundData[game.currentRound]!;
+    const roundData = game.roundData[game.currentRound];
+    if (!roundData) return;
     if (roundData.confirmedVotes.includes(player.nickname)) return; //disallow revoting
 
     player.voted = true;
@@ -165,6 +162,13 @@ export const registerPlayerSocket = (
     //get his final client votes and start adding
     if (roundData.clientVotes[player.nickname]) {
       const playerVotes = roundData.clientVotes[player.nickname];
+
+      game.players.forEach((p) => {
+        if (!playerVotes[p.nickname] && p.nickname !== player.nickname) {
+          playerVotes[p.nickname] = 0;
+        }
+      });
+
       Object.keys(playerVotes).forEach((playerToVoteFor) => {
         if (playerToVoteFor !== player.nickname) {
           if (!roundData.votes[playerToVoteFor]) {

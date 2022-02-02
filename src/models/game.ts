@@ -114,16 +114,16 @@ export class Game {
         roundData.votes[p.nickname] = {};
       }
 
-      if (!roundData.votes[p.nickname][newCategory]) {
+      if (newCategory && !roundData.votes[p.nickname][newCategory]) {
         roundData.votes[p.nickname][newCategory] = [];
       }
     });
   }
 
   checkEveryoneVoted() {
-    const roundData = this.roundData[this.currentRound]!;
+    const roundData = this.roundData[this.currentRound];
     const category = this.options.categories[this.currentVotingCategory];
-    if (roundData.confirmedVotes.length === this.players.length) {
+    if (roundData && roundData.confirmedVotes.length === this.players.length) {
       //voting done, update final points and initiate new round
 
       Object.keys(roundData.votes).forEach((nick) => {
@@ -273,6 +273,10 @@ export class Game {
 
       if (roundData.votes[nickname]) {
         delete roundData.votes[nickname];
+      }
+
+      if (roundData.playerValues[nickname]) {
+        delete roundData.playerValues[nickname];
       }
     }
 
