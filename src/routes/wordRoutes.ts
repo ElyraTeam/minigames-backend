@@ -6,6 +6,22 @@ import { nanoid } from "nanoid";
 import { Game, Player, RoomOptions, State } from "../models/game";
 import storage from "../storage";
 
+router.get("/stats", (req, res) => {
+  const stats = {
+    gameCount: storage.games.length,
+    playerCount: storage.games.reduce(
+      (total, g) => total + g.players.length,
+      0
+    ),
+    players: storage.games.reduce(
+      (total, g) => total.concat(g.players.map((p) => p.nickname) as never[]),
+      []
+    ),
+    games: storage.games.map((g) => g.id),
+  };
+  return res.status(200).json(stats);
+});
+
 router.get("/room/debug/:roomId", (req, res) => {
   const roomId = req.params.roomId;
   const game = storage.games.find((g) => g.id == roomId);
@@ -63,8 +79,10 @@ router.post("/room/join/:roomId", (req, res) => {
   }
 
   let player: Player;
+  let reconnect = false;
   if (foundPlayer) {
     player = foundPlayer;
+    reconnect = true;
   } else {
     if (game.state != State.LOBBY) {
       return res.status(403).json(errors.gameRunning);
@@ -76,7 +94,9 @@ router.post("/room/join/:roomId", (req, res) => {
   player.authToken = nanoid();
   player.owner = player.nickname === game.owner;
 
-  game.chat("system", `انضم ${player.nickname}.`);
+  if (!reconnect) {
+    game.chat("system", `انضم ${player.nickname}.`);
+  }
 
   storage.saveGames();
 
@@ -103,23 +123,7 @@ router.post("/room/leave/:roomId", (req, res) => {
     return res.status(404).json(errors.unknownPlayer);
   }
 
-  game.removePlayer(nickname);
-  if (game.players.length == 0) {
-    //last player, delete game;
-    storage.removeGame(game.id);
-  } else if (game.players.length > 0) {
-    //find another owner, for now get next player
-    if (foundPlayer.owner) {
-      const newOwner = game.players[0];
-      newOwner.owner = true;
-      game.owner = newOwner.nickname;
-
-      game.chat("system", `اصبح ${game.owner} الاونر.`);
-    }
-  }
-
-  game.checkEveryoneVoted();
-
+  game.removePlayerLogic(nickname);
   storage.saveGames();
 
   if (foundPlayer.socketId) {

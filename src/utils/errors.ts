@@ -3,14 +3,14 @@ const error = (code: number, message: string) => ({
   error: message,
 });
 
-export const roomNotFound = error(1000, "Room not found.");
-export const roomFull = error(1001, "Room full.");
-export const nicknameInUse = error(1002, "Nickname already in use.");
-export const gameRunning = error(1003, "Game is running.");
-export const unknownPlayer = error(1004, "Player not found.");
-export const noPermission = error(1005, "No permission.");
-export const cantKick = error(1006, "Cannot kick owner or self.");
-export const playerBanned = error(1007, "You can't join this game.");
-export const invalidRoomOptions = error(1008, "Invalid room options.");
+export const roomNotFound = error(1000, "الغرفة غير موجودة.");
+export const roomFull = error(1001, "الغرفة مكتملة.");
+export const nicknameInUse = error(1002, "الاسم مستخدم من قبل.");
+export const gameRunning = error(1003, "اللعبة قيد التشغيل.");
+export const unknownPlayer = error(1004, "اللاعب غير موجود.");
+export const noPermission = error(1005, "لا يوجد صلاحية.");
+export const cantKick = error(1006, "لا يمكن طرد نفسك او المسؤول.");
+export const playerBanned = error(1007, "لا يمكنك دخول هذه الغرفة.");
+export const invalidRoomOptions = error(1008, "اعدادات غير صحيحة.");
 
-export const unexpectedError = error(1010, "Unexpected error.");
+export const unexpectedError = error(1010, "خطأ غير متوقع.");

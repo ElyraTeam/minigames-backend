@@ -19,7 +19,7 @@ export enum State {
 
 export type PlayerValues = { [name: string]: string };
 export type Points = { [name: string]: number };
-export type Votes = { [name: string]: number[] };
+export type Votes = { [name: string]: { [k: string]: number } };
 export type ClientVotes = { [key: string]: { [k: string]: number } };
 
 export interface RoundData {
@@ -115,9 +115,18 @@ export class Game {
       }
 
       if (newCategory && !roundData.votes[p.nickname][newCategory]) {
-        roundData.votes[p.nickname][newCategory] = [];
+        roundData.votes[p.nickname][newCategory] = {};
       }
     });
+
+    if (this.options.categories[this.currentVotingCategory]) {
+      this.chat(
+        "system",
+        "بداية التصويت لفئة " +
+          this.options.categories[this.currentVotingCategory],
+        "bold"
+      );
+    }
   }
 
   checkEveryoneVoted() {
@@ -127,7 +136,7 @@ export class Game {
       //voting done, update final points and initiate new round
 
       Object.keys(roundData.votes).forEach((nick) => {
-        const v = roundData.votes[nick][category];
+        const v = Object.values(roundData.votes[nick][category]);
         let maj = 0;
         if (v.length > 0) {
           maj = findMajority(v);
@@ -206,11 +215,12 @@ export class Game {
     }
   }
 
-  chat(sender: string, message: string) {
+  chat(sender: string, message: string, font: "normal" | "bold" = "normal") {
     storage.io.to(this.id).emit("chat", {
       type: sender === "system" ? "system" : "player",
       sender,
       message,
+      font,
     } as ChatMessage);
   }
 
@@ -278,14 +288,47 @@ export class Game {
       if (roundData.playerValues[nickname]) {
         delete roundData.playerValues[nickname];
       }
+
+      this.players.forEach((p) => {
+        if (p.nickname !== nickname) {
+          Object.keys(roundData.votes[p.nickname]).forEach((voteCat) => {
+            if (roundData.votes[p.nickname][voteCat][nickname]) {
+              delete roundData.votes[p.nickname][voteCat][nickname];
+            }
+          });
+        }
+      });
     }
 
     if (this.state == State.VOTING) {
       this.updateVoteCount();
       this.updatePlayerVotes();
+      this.sendNextCategoryForVoting();
     }
 
     this.players = this.players.filter((p) => p.nickname !== nickname);
+  }
+
+  removePlayerLogic(nickname: string) {
+    const foundPlayer = this.getPlayerWithName(nickname);
+    if (foundPlayer) {
+      this.removePlayer(nickname);
+      if (this.players.length == 0) {
+        //last player, delete game;
+        storage.removeGame(this.id);
+      } else if (this.players.length > 0) {
+        //find another owner, for now get next player
+        if (foundPlayer.owner) {
+          const newOwner = this.players[0];
+          newOwner.owner = true;
+          this.owner = newOwner.nickname;
+
+          this.chat("system", `اصبح ${this.owner} المسؤول.`);
+        }
+      }
+
+      this.checkEveryoneVoted();
+    }
   }
 }
 export class Player {
@@ -295,6 +338,7 @@ export class Player {
   public lastRoundScore = 0;
   public socketId?: string;
   public voted: boolean = false;
+  public offlineAt = 0;
 
   constructor(
     public nickname: string,

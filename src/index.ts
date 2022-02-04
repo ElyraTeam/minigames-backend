@@ -113,9 +113,32 @@ storage.io.on("connection", (socket) => {
           socket.on("disconnect", () => {
             player.socketId = undefined;
             player.online = false;
+            player.offlineAt = Date.now();
             game.syncPlayers();
+
+            setTimeout(() => {
+              // console.log(
+              //   player.nickname,
+              //   Date.now(),
+              //   player.offlineAt,
+              //   player.offlineAt + 60 * 1000
+              // );
+              if (
+                Date.now() >= player.offlineAt + 1 * 60 * 1000 &&
+                player.online == false
+              ) {
+                game.removePlayerLogic(player.nickname);
+                game.chat(
+                  "system",
+                  "تم طرد " + player.nickname + " لعدم النشاط."
+                );
+                game.syncPlayers();
+                storage.saveGames();
+              }
+            }, 1 * 60 * 1000);
           });
 
+          player.offlineAt = 0;
           player.socketId = socket.id;
           player.online = true;
 

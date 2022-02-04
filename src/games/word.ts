@@ -130,7 +130,10 @@ export const registerPlayerSocket = (
     }
 
     Object.entries(voteData).forEach(([playerToVoteFor, val]) => {
-      if (playerToVoteFor !== player.nickname) {
+      if (
+        game.hasPlayerWithName(playerToVoteFor) &&
+        playerToVoteFor !== player.nickname
+      ) {
         //give 0 for empty values
         const playerVals = roundData.playerValues[playerToVoteFor]!;
         const playerCategoryVal = playerVals[category];
@@ -170,18 +173,20 @@ export const registerPlayerSocket = (
       });
 
       Object.keys(playerVotes).forEach((playerToVoteFor) => {
-        if (playerToVoteFor !== player.nickname) {
+        if (
+          game.hasPlayerWithName(playerToVoteFor) &&
+          playerToVoteFor !== player.nickname
+        ) {
           if (!roundData.votes[playerToVoteFor]) {
             roundData.votes[playerToVoteFor] = {};
           }
 
           if (!roundData.votes[playerToVoteFor][category]) {
-            roundData.votes[playerToVoteFor][category] = [];
+            roundData.votes[playerToVoteFor][category] = {};
           }
 
-          roundData.votes[playerToVoteFor][category].push(
-            playerVotes[playerToVoteFor]
-          );
+          roundData.votes[playerToVoteFor][category][player.nickname] =
+            playerVotes[playerToVoteFor];
         }
       });
     }
