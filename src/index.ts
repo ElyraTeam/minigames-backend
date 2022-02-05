@@ -76,7 +76,6 @@ app.use((req, res, next) => {
 });
 
 app.use(Sentry.Handlers.requestHandler());
-// TracingHandler creates a trace for every incoming request
 app.use(Sentry.Handlers.tracingHandler());
 
 app.get("/", (req, res) => {

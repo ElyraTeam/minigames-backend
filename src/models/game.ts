@@ -122,8 +122,9 @@ export class Game {
     if (this.options.categories[this.currentVotingCategory]) {
       this.chat(
         "system",
-        "بداية التصويت لفئة " +
-          this.options.categories[this.currentVotingCategory],
+        `بداية التصويت لـ(${
+          this.options.categories[this.currentVotingCategory]
+        })`,
         "bold"
       );
     }

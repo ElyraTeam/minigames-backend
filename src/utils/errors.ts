@@ -12,5 +12,6 @@ export const noPermission = error(1005, "لا يوجد صلاحية.");
 export const cantKick = error(1006, "لا يمكن طرد نفسك او المسؤول.");
 export const playerBanned = error(1007, "لا يمكنك دخول هذه الغرفة.");
 export const invalidRoomOptions = error(1008, "اعدادات غير صحيحة.");
+export const alreadyInRoom = error(1009, "انت بالفعل في هذه الغرفة.");
 
 export const unexpectedError = error(1010, "خطأ غير متوقع.");
