@@ -290,7 +290,7 @@ export class Game {
       }
 
       this.players.forEach((p) => {
-        if (p.nickname !== nickname) {
+        if (p.nickname !== nickname && roundData.votes[p.nickname]) {
           Object.keys(roundData.votes[p.nickname]).forEach((voteCat) => {
             if (roundData.votes[p.nickname][voteCat][nickname]) {
               delete roundData.votes[p.nickname][voteCat][nickname];
