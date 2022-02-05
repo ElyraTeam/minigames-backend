@@ -115,7 +115,7 @@ storage.io.on("connection", (socket) => {
             player.online = false;
             player.offlineAt = Date.now();
             game.syncPlayers();
-
+            storage.saveGames();
             setTimeout(() => {
               // console.log(
               //   player.nickname,
@@ -124,6 +124,7 @@ storage.io.on("connection", (socket) => {
               //   player.offlineAt + 60 * 1000
               // );
               if (
+                game.hasPlayerWithName(player.nickname) &&
                 Date.now() >= player.offlineAt + 1 * 60 * 1000 &&
                 player.online == false
               ) {
@@ -136,6 +137,10 @@ storage.io.on("connection", (socket) => {
                 storage.saveGames();
               }
             }, 1 * 60 * 1000);
+          });
+
+          socket.on("ping", (cb) => {
+            if (typeof cb === "function") cb();
           });
 
           player.offlineAt = 0;
