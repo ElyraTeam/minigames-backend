@@ -65,10 +65,6 @@ router.post("/room/join/:roomId", (req, res) => {
     return res.status(404).json(errors.roomNotFound);
   }
 
-  if (game.isFull()) {
-    return res.status(403).json(errors.roomFull);
-  }
-
   const foundPlayer = game.getPlayerWithName(nickname);
   if (foundPlayer) {
     if (foundPlayer.sessionId != req.session!.id) {
@@ -76,6 +72,10 @@ router.post("/room/join/:roomId", (req, res) => {
     } else if (foundPlayer.sessionId == req.session!.id && foundPlayer.online) {
       return res.status(403).json(errors.alreadyInRoom);
     }
+  }
+
+  if (!foundPlayer && game.isFull()) {
+    return res.status(403).json(errors.roomFull);
   }
 
   if (game.kickedPlayerSessions.includes(req.session!.id!)) {

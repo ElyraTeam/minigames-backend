@@ -45,7 +45,13 @@ storage.io = new Server(http, {
 const PORT = process.env.PORT || 3000;
 
 app.set("trust proxy", "loopback");
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: false,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(hpp());
@@ -84,6 +90,16 @@ app.get("/", (req, res) => {
 
 app.use("/assets", express.static("./static"));
 app.use("/word", wordRouter);
+
+// app.get("/sound/:sound", (req, res) => {
+//   const sound = req.params.sound;
+//   res.header("Content-Disposition", "inline");
+//   res.header("Accept-Ranges", "bytes");
+//   res.sendFile(`${sound}`, {
+//     root: "./static",
+//     dotfiles: "deny",
+//   });
+// });
 
 app.use(Sentry.Handlers.errorHandler());
 

@@ -1,0 +1,39 @@
+<html>
+
+<head></head>
+
+<body>
+    <button class="play">play</button>
+    <script>
+        const audioCtx = new window.AudioContext();
+        const sounds = new Map();
+        const req = new XMLHttpRequest();
+        req.open("GET", "http://localhost:3000/assets/flip.ogg");
+        req.responseType = "arraybuffer";
+        req.onload = (e) => {
+            audioCtx.decodeAudioData(req.response, function (t) {
+                sounds.set("1", t);
+
+
+            }, function (t) {
+                console.log("Failed loading audio from url '" + e + "'");
+            });
+        };
+        req.send();
+
+        function playSound(key) {
+            const buffer = sounds.get(key);
+            const n = audioCtx.createBufferSource();
+            n.buffer = buffer;
+            n.connect(audioCtx.destination);
+            n.start(0);
+        }
+
+        var play = document.querySelector('.play');
+        play.onclick = function () {
+            playSound("1");
+        };
+    </script>
+</body>
+
+</html>

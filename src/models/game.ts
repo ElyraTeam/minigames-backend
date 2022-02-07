@@ -308,6 +308,9 @@ export class Game {
     }
 
     this.players = this.players.filter((p) => p.nickname !== nickname);
+    if (this.state == State.VOTING) {
+      this.checkEveryoneVoted();
+    }
   }
 
   removePlayerLogic(nickname: string) {
@@ -327,8 +330,6 @@ export class Game {
           this.chat("system", `اصبح ${this.owner} المسؤول.`);
         }
       }
-
-      this.checkEveryoneVoted();
     }
   }
 }
