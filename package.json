@@ -18,6 +18,8 @@
     "@sentry/node": "^6.17.3",
     "@sentry/tracing": "^6.17.3",
     "cookie-session": "^2.0.0",
+    "dotenv": "^16.0.0",
+    "dropbox": "^10.24.0",
     "express": "^4.17.2",
     "helmet": "^5.0.2",
     "hpp": "^0.2.3",

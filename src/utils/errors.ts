@@ -6,7 +6,7 @@ const error = (code: number, message: string) => ({
 export const roomNotFound = error(1000, "الغرفة غير موجودة.");
 export const roomFull = error(1001, "الغرفة مكتملة.");
 export const nicknameInUse = error(1002, "الاسم مستخدم من قبل.");
-export const gameRunning = error(1003, "اللعبة قيد التشغيل.");
+export const gameRunning = error(1003, "لا يمكن الدخول واللعبة تعمل.");
 export const unknownPlayer = error(1004, "اللاعب غير موجود.");
 export const noPermission = error(1005, "لا يوجد صلاحية.");
 export const cantKick = error(1006, "لا يمكن طرد نفسك او المسؤول.");

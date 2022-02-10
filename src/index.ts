@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { NextFunction } from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -189,7 +190,8 @@ storage.io.on("connection", (socket) => {
 });
 
 function loadData() {
-  startServer();
+  console.log("Loading games...");
+  storage.loadGames().then(() => startServer());
 }
 
 function startServer() {
