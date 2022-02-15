@@ -62,8 +62,7 @@ app.use(cors(corsOptions));
 app.use(
   cookieSession({
     name: "session",
-    //TODO: move secret
-    secret: "37n6bfuZy&5uoXjJkhcfvfjlghbgkjunli",
+    secret: process.env.COOKIE_SECRET,
     sameSite: "none",
     secureProxy: true,
     maxAge: 604800000,

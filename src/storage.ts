@@ -2,7 +2,7 @@ import { Server } from "socket.io";
 import { Game } from "./models/game";
 import fs from "fs";
 import { Dropbox } from "dropbox";
-import { plainToClass, plainToInstance } from "class-transformer";
+import { plainToInstance } from "class-transformer";
 import { Feedback } from "./models/feedback";
 
 const dbx = new Dropbox({ accessToken: process.env.DBX_TOKEN });
