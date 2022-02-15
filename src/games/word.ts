@@ -90,6 +90,7 @@ export const registerPlayerSocket = (
               if (!values[cat]) {
                 values[cat] = "";
               }
+              values[cat] = values[cat].trim();
             });
             roundData.playerValues[p.nickname] = values;
           }
@@ -118,6 +119,10 @@ export const registerPlayerSocket = (
     const roundData = game.roundData[game.currentRound];
     if (!roundData) return;
 
+    if (!roundData.clientVotes) {
+      roundData.clientVotes = {};
+    }
+
     game.players.forEach((p) => {
       if (!roundData.clientVotes[p.nickname]) {
         roundData.clientVotes[p.nickname] = {};
@@ -127,6 +132,10 @@ export const registerPlayerSocket = (
     //Cant vote for self lol
     if (voteData[player.nickname]) {
       delete voteData[player.nickname];
+    }
+
+    if (!roundData.clientVotes[player.nickname]) {
+      roundData.clientVotes[player.nickname] = {};
     }
 
     Object.entries(voteData).forEach(([playerToVoteFor, val]) => {

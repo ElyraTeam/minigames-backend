@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import "dotenv/config";
 import express, { NextFunction } from "express";
 import { createServer } from "http";
@@ -17,6 +18,7 @@ import { nanoid } from "nanoid";
 import { AuthenticateRequest } from "./models/socket";
 import { registerPlayerSocket } from "./games/word";
 import { State } from "./models/game";
+import { Feedback } from "./models/feedback";
 
 const app = express();
 const http = createServer(app);
@@ -89,6 +91,19 @@ app.get("/", (req, res) => {
   res.status(200).send("All good!");
 });
 
+app.post("/feedback", (req, res) => {
+  const feedback = req.body as Feedback;
+  feedback.receivedAt = Date.now();
+
+  if (!feedback.game || !feedback.message || !feedback.name) {
+    return res.status(403).json(errors.unexpectedError);
+  }
+
+  storage.feedbacks.push(feedback);
+  storage.saveFeedbacks();
+  return res.status(204).end();
+});
+
 app.use("/assets", express.static("./static"));
 app.use("/word", wordRouter);
 
@@ -142,7 +157,8 @@ storage.io.on("connection", (socket) => {
               if (
                 game.hasPlayerWithName(player.nickname) &&
                 Date.now() >= player.offlineAt + 1 * 60 * 1000 &&
-                player.online == false
+                player.online == false &&
+                player.socketId == undefined
               ) {
                 game.removePlayerLogic(player.nickname);
                 game.chat(
@@ -191,7 +207,10 @@ storage.io.on("connection", (socket) => {
 
 function loadData() {
   console.log("Loading games...");
-  storage.loadGames().then(() => startServer());
+  storage
+    .loadGames()
+    .then(() => storage.loadFeedbacks())
+    .then(() => startServer());
 }
 
 function startServer() {
