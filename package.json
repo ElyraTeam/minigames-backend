@@ -2,8 +2,8 @@
   "name": "minigames-backend",
   "version": "1.0.0",
   "main": "dist/index.js",
-  "repository": "https://github.com/BianTeam/MinigamesBackend.git",
-  "author": "Bian Team",
+  "repository": "https://github.com/ElyraTeam/MinigamesBackend.git",
+  "author": "Elyra Team",
   "license": "MIT",
   "private": true,
   "scripts": {
