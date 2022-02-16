@@ -37,4 +37,4 @@ Feel free to contribute if you have either suggestions or fixes. You can contrib
 
 ## License
 
-This project is licensed under [MIT](https://github.com/ElyraTeam/MinigamesWeb/blob/main/LICENSE.md) License.
+This project is licensed under [MIT](https://github.com/ElyraTeam/MinigamesBackend/blob/main/LICENSE.md) License.
