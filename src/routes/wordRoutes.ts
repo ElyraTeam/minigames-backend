@@ -1,10 +1,20 @@
 import express from "express";
 const router = express.Router();
-
+import * as basicAuth from "express-basic-auth";
 import * as errors from "../utils/errors";
 import { nanoid } from "nanoid";
 import { Game, Player, RoomOptions, State } from "../models/game";
 import storage from "../storage";
+
+const authOptions: basicAuth.BasicAuthMiddlewareOptions = {
+  challenge: true,
+  users: {
+    admin: process.env.ADMIN_PASS!,
+  },
+};
+
+router.use("/stats", basicAuth.default(authOptions));
+router.use("/room/debug/:roomId", basicAuth.default(authOptions));
 
 router.get("/stats", (req, res) => {
   const stats = {
