@@ -58,7 +58,7 @@ router.post("/room/create", (req, res) => {
 
   const roomId = nanoid(8);
   const game = new Game(roomId, body.nickname, body.options);
-
+  game.createdAt = new Date().toISOString();
   storage.games.push(game);
   storage.saveGames();
 

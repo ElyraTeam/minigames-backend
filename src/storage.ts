@@ -16,11 +16,14 @@ class Storage {
     this.saveGames();
   }
 
+  private getFileName = () =>
+    process.env.NODE_ENV === "development" ? "games-dev.json" : "games.json";
+
   saveGames() {
-    fs.writeFileSync("games.json", JSON.stringify(this.games, null, 2));
+    fs.writeFileSync(this.getFileName(), JSON.stringify(this.games, null, 2));
     dbx
       .filesUpload({
-        path: "/games.json",
+        path: `/${this.getFileName()}`,
         mode: { ".tag": "overwrite" },
         contents: JSON.stringify(this.games, null, 2),
       })
@@ -31,7 +34,7 @@ class Storage {
 
   async loadGames() {
     const games = await dbx
-      .filesDownload({ path: "/games.json" })
+      .filesDownload({ path: `/${this.getFileName()}` })
       .catch((err) => console.log("Error loading games", err));
     if (games && games.result) {
       const tempGames: Object[] = JSON.parse((<any>games.result).fileBinary);

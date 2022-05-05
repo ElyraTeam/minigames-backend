@@ -46,6 +46,7 @@ export class Game {
   public doneLetters: string[] = [];
   public kickedPlayerSessions: string[] = [];
   public stoppedAt: number = 0;
+  public createdAt: String = "";
 
   public roundData: { [key: number]: RoundData | undefined } = {};
 
@@ -259,6 +260,10 @@ export class Game {
 
   isFull() {
     return this.players.length == this.options.maxPlayers;
+  }
+
+  getOnlinePlayers() {
+    return this.players.filter((p) => p.online);
   }
 
   hasPlayerWithName(nickname: string) {

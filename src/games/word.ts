@@ -80,11 +80,19 @@ export const registerPlayerSocket = (
     game.players.forEach((p) => {
       p.voted = false;
       p.lastRoundScore = 0;
+
+      const values: { [name: string]: string } = {};
+      game.options.categories.forEach((cat) => {
+        if (!values[cat]) {
+          values[cat] = "";
+        }
+      });
+      roundData.playerValues[p.nickname] = values;
+
       //Values is a map of category => value
       p.getSocket()?.emit(
         "request-values",
         (values: { [name: string]: string }) => {
-          //Check if send window is open
           if (Date.now() <= game.stoppedAt + 5000) {
             game.options.categories.forEach((cat) => {
               if (!values[cat]) {
@@ -92,13 +100,15 @@ export const registerPlayerSocket = (
               }
               values[cat] = values[cat].trim();
             });
-            roundData.playerValues[p.nickname] = values;
+          } else {
+            game.options.categories.forEach((cat) => {
+              values[cat] = "";
+            });
           }
-
+          roundData.playerValues[p.nickname] = values;
           //Check if every player sent their data
           if (
-            Object.entries(roundData.playerValues).length ===
-            game.players.length
+            Object.entries(roundData.playerValues).length >= game.players.length
           ) {
             //Start voting process
             game.currentVotingCategory = 0;
