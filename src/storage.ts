@@ -1,21 +1,21 @@
 import { Server } from "socket.io";
-import { WordGame } from "./models/word/game";
+import { WordGame } from "./models/word/game.js";
 import fs from "fs";
 import { Dropbox } from "dropbox";
 import { plainToInstance } from "class-transformer";
-import { Feedback } from "./models/feedback";
-import { MsGame } from "./models/minesweeper/game";
+import { Feedback } from "./models/feedback.js";
+import { MsGame } from "./models/minesweeper/game.js";
 
 interface Games {
-  word: WordGame[],
-  minesweeper: MsGame[]
+  word: WordGame[];
+  minesweeper: MsGame[];
 }
 
 const dbx = new Dropbox({ accessToken: process.env.DBX_TOKEN });
 class Storage {
   public games: Games = {
     word: [],
-    minesweeper: []
+    minesweeper: [],
   };
   public feedbacks: Feedback[] = [];
   public io!: Server;

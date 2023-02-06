@@ -1,6 +1,6 @@
-import storage from "../../storage";
-import { findMajority } from "../../utils/utils";
-import { ChatMessage } from "./socket";
+import storage from "../../storage.js";
+import { findMajority } from "../../utils/utils.js";
+import { ChatMessage } from "./socket.js";
 
 export interface WordRoomOptions {
   rounds: number;
@@ -54,7 +54,7 @@ export class WordGame {
     public id: string,
     public owner: string,
     public options: WordRoomOptions
-  ) { }
+  ) {}
 
   toJson() {
     return JSON.stringify(
@@ -123,7 +123,8 @@ export class WordGame {
     if (this.options.categories[this.currentVotingCategory]) {
       this.chat(
         "system",
-        `بداية التصويت لـ(${this.options.categories[this.currentVotingCategory]
+        `بداية التصويت لـ(${
+          this.options.categories[this.currentVotingCategory]
         })`,
         "bold"
       );
@@ -228,12 +229,12 @@ export class WordGame {
   newRandomLetter() {
     let letter =
       this.options.letters[
-      Math.floor(Math.random() * this.options.letters.length)
+        Math.floor(Math.random() * this.options.letters.length)
       ];
     while (this.doneLetters.includes(letter)) {
       letter =
         this.options.letters[
-        Math.floor(Math.random() * this.options.letters.length)
+          Math.floor(Math.random() * this.options.letters.length)
         ];
     }
     return letter;
@@ -350,7 +351,7 @@ export class WordPlayer {
     public nickname: string,
     public owner: boolean,
     public sessionId: string
-  ) { }
+  ) {}
 
   getSocket() {
     if (!this.socketId) {

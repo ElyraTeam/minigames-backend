@@ -3,7 +3,7 @@ import "dotenv/config";
 import express, { NextFunction } from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import * as errors from "./utils/errors";
+import * as errors from "./utils/errors.js";
 import cookieSession from "cookie-session";
 import helmet from "helmet";
 import hpp from "hpp";
@@ -12,13 +12,13 @@ import morgan from "morgan";
 import * as Sentry from "@sentry/node";
 import * as Tracing from "@sentry/tracing";
 
-import wordRouter from "./routes/wordRoutes";
-import storage from "./storage";
+import wordRouter from "./routes/wordRoutes.js";
+import storage from "./storage.js";
 import { nanoid } from "nanoid";
-import { AuthenticateRequest } from "./models/word/socket";
-import { registerPlayerSocket } from "./games/word";
-import { State } from "./models/word/game";
-import { Feedback } from "./models/feedback";
+import { AuthenticateRequest } from "./models/word/socket.js";
+import { registerPlayerSocket } from "./games/word.js";
+import { State } from "./models/word/game.js";
+import { Feedback } from "./models/feedback.js";
 
 const app = express();
 const http = createServer(app);
@@ -33,8 +33,8 @@ Sentry.init({
   tracesSampleRate: 1.0,
 });
 
-const corsOptions = {
-  origin: (origin: any, callback: (err: any, origin?: any) => void) => {
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
     callback(null, origin);
   },
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -72,16 +72,16 @@ app.use(
 app.use(morgan("combined"));
 
 //Assign random id to each session
-app.use((req, res, next) => {
-  if (!req.session) {
-    req.session = {};
-  }
+// app.use((req: express.Request, res: express.Response, next) => {
+//   if (!req.session) {
+//     req.session = {};
+//   }
 
-  if (!req.session.id) {
-    req.session.id = nanoid();
-  }
-  next();
-});
+//   if (!req.session.id) {
+//     req.session.id = nanoid();
+//   }
+//   next();
+// });
 
 app.use(Sentry.Handlers.requestHandler());
 app.use(Sentry.Handlers.tracingHandler());

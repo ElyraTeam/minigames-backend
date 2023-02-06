@@ -1,14 +1,14 @@
 import { Socket } from "socket.io";
 import { stringify } from "uuid";
 import {
-  Game,
-  Player,
+  WordGame as Game,
+  WordPlayer as Player,
   PlayerValues,
   Points,
   RoundData,
   State,
-} from "../models/word/game";
-import storage from "../storage";
+} from "../models/word/game.js";
+import storage from "../storage.js";
 
 export const registerPlayerSocket = (
   socket: Socket,

@@ -1,10 +1,15 @@
 import express from "express";
 const router = express.Router();
 import * as basicAuth from "express-basic-auth";
-import * as errors from "../utils/errors";
+import * as errors from "../utils/errors.js";
 import { nanoid } from "nanoid";
-import { WordGame, WordPlayer, WordRoomOptions, State } from "../models/word/game";
-import storage from "../storage";
+import {
+  WordGame,
+  WordPlayer,
+  WordRoomOptions,
+  State,
+} from "../models/word/game.js";
+import storage from "../storage.js";
 
 const authOptions: basicAuth.BasicAuthMiddlewareOptions = {
   challenge: true,
@@ -237,4 +242,4 @@ router.post("/room/options/:roomId", (req, res) => {
 
   return res.status(204).end();
 });
-export = router;
+export default router;
