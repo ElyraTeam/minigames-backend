@@ -3,7 +3,7 @@ const router = express.Router();
 import * as basicAuth from "express-basic-auth";
 import * as errors from "../utils/errors";
 import { nanoid } from "nanoid";
-import { Game, Player, RoomOptions, State } from "../models/game";
+import { WordGame, WordPlayer, WordRoomOptions, State } from "../models/word/game";
 import storage from "../storage";
 
 const authOptions: basicAuth.BasicAuthMiddlewareOptions = {
@@ -18,23 +18,23 @@ router.use("/room/debug/:roomId", basicAuth.default(authOptions));
 
 router.get("/stats", (req, res) => {
   const stats = {
-    gameCount: storage.games.length,
-    playerCount: storage.games.reduce(
+    gameCount: storage.games.word.length,
+    playerCount: storage.games.word.reduce(
       (total, g) => total + g.players.length,
       0
     ),
-    players: storage.games.reduce(
+    players: storage.games.word.reduce(
       (total, g) => total.concat(g.players.map((p) => p.nickname) as never[]),
       []
     ),
-    games: storage.games.map((g) => g.id),
+    games: storage.games.word.map((g) => g.id),
   };
   return res.status(200).json(stats);
 });
 
 router.get("/room/debug/:roomId", (req, res) => {
   const roomId = req.params.roomId;
-  const game = storage.games.find((g) => g.id == roomId);
+  const game = storage.games.word.find((g) => g.id == roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
@@ -45,7 +45,7 @@ router.get("/room/debug/:roomId", (req, res) => {
 });
 
 router.post("/room/create", (req, res) => {
-  const body = req.body as { nickname: string; options: RoomOptions };
+  const body = req.body as { nickname: string; options: WordRoomOptions };
 
   if (
     body.options.categories.length == 0 ||
@@ -57,9 +57,9 @@ router.post("/room/create", (req, res) => {
   }
 
   const roomId = nanoid(8);
-  const game = new Game(roomId, body.nickname, body.options);
+  const game = new WordGame(roomId, body.nickname, body.options);
   game.createdAt = new Date().toISOString();
-  storage.games.push(game);
+  storage.games.word.push(game);
   storage.saveGames();
 
   return res.status(200).json({ roomId });
@@ -69,7 +69,7 @@ router.post("/room/join/:roomId", (req, res) => {
   const roomId = req.params.roomId;
   const { nickname } = req.body as { nickname: string };
 
-  const game = storage.games.find((g) => g.id == roomId);
+  const game = storage.games.word.find((g) => g.id == roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
@@ -92,7 +92,7 @@ router.post("/room/join/:roomId", (req, res) => {
     return res.status(403).json(errors.playerBanned);
   }
 
-  let player: Player;
+  let player: WordPlayer;
   let reconnect = false;
   if (foundPlayer) {
     player = foundPlayer;
@@ -102,7 +102,7 @@ router.post("/room/join/:roomId", (req, res) => {
       return res.status(403).json(errors.gameRunning);
     }
 
-    player = new Player(nickname, false, req.session!.id!);
+    player = new WordPlayer(nickname, false, req.session!.id!);
     game.players.push(player);
   }
   player.authToken = nanoid();
@@ -126,7 +126,7 @@ router.post("/room/leave/:roomId", (req, res) => {
   const roomId = req.params.roomId;
   const { nickname } = req.body as { nickname: string };
 
-  const game = storage.games.find((g) => g.id == roomId);
+  const game = storage.games.word.find((g) => g.id == roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
@@ -159,7 +159,7 @@ router.post("/room/kick/:roomId", (req, res) => {
     toKickNickname: string;
   };
 
-  const game = storage.games.find((g) => g.id == roomId);
+  const game = storage.games.word.find((g) => g.id == roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
@@ -200,10 +200,10 @@ router.post("/room/options/:roomId", (req, res) => {
   const roomId = req.params.roomId;
   const { nickname, options } = req.body as {
     nickname: string;
-    options: RoomOptions;
+    options: WordRoomOptions;
   };
 
-  const game = storage.games.find((g) => g.id == roomId);
+  const game = storage.games.word.find((g) => g.id == roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);

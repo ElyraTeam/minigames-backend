@@ -1,8 +1,8 @@
-import storage from "../storage";
-import { findMajority } from "../utils/utils";
+import storage from "../../storage";
+import { findMajority } from "../../utils/utils";
 import { ChatMessage } from "./socket";
 
-export interface RoomOptions {
+export interface WordRoomOptions {
   rounds: number;
   letters: string[];
   categories: string[];
@@ -37,8 +37,8 @@ export interface RoundData {
   clientVotes: ClientVotes;
 }
 
-export class Game {
-  public players: Player[] = [];
+export class WordGame {
+  public players: WordPlayer[] = [];
   public currentRound = 1;
   public currentLetter: string = "";
   public state: State = State.LOBBY;
@@ -53,8 +53,8 @@ export class Game {
   constructor(
     public id: string,
     public owner: string,
-    public options: RoomOptions
-  ) {}
+    public options: WordRoomOptions
+  ) { }
 
   toJson() {
     return JSON.stringify(
@@ -123,8 +123,7 @@ export class Game {
     if (this.options.categories[this.currentVotingCategory]) {
       this.chat(
         "system",
-        `بداية التصويت لـ(${
-          this.options.categories[this.currentVotingCategory]
+        `بداية التصويت لـ(${this.options.categories[this.currentVotingCategory]
         })`,
         "bold"
       );
@@ -210,7 +209,7 @@ export class Game {
     });
   }
 
-  kick(toKick: Player) {
+  kick(toKick: WordPlayer) {
     if (toKick.socketId) {
       toKick.getSocket()?.emit("kick", "تم طردك من الغرفة.");
       toKick.getSocket()?.disconnect();
@@ -229,12 +228,12 @@ export class Game {
   newRandomLetter() {
     let letter =
       this.options.letters[
-        Math.floor(Math.random() * this.options.letters.length)
+      Math.floor(Math.random() * this.options.letters.length)
       ];
     while (this.doneLetters.includes(letter)) {
       letter =
         this.options.letters[
-          Math.floor(Math.random() * this.options.letters.length)
+        Math.floor(Math.random() * this.options.letters.length)
         ];
     }
     return letter;
@@ -338,7 +337,7 @@ export class Game {
     }
   }
 }
-export class Player {
+export class WordPlayer {
   public authToken?: string;
   public online: boolean = false;
   public totalScore = 0;
@@ -351,7 +350,7 @@ export class Player {
     public nickname: string,
     public owner: boolean,
     public sessionId: string
-  ) {}
+  ) { }
 
   getSocket() {
     if (!this.socketId) {

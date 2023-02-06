@@ -7,7 +7,7 @@ import {
   Points,
   RoundData,
   State,
-} from "../models/game";
+} from "../models/word/game";
 import storage from "../storage";
 
 export const registerPlayerSocket = (

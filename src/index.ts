@@ -15,9 +15,9 @@ import * as Tracing from "@sentry/tracing";
 import wordRouter from "./routes/wordRoutes";
 import storage from "./storage";
 import { nanoid } from "nanoid";
-import { AuthenticateRequest } from "./models/socket";
+import { AuthenticateRequest } from "./models/word/socket";
 import { registerPlayerSocket } from "./games/word";
-import { State } from "./models/game";
+import { State } from "./models/word/game";
 import { Feedback } from "./models/feedback";
 
 const app = express();
@@ -45,7 +45,7 @@ storage.io = new Server(http, {
   cors: corsOptions,
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 app.set("trust proxy", "loopback");
 app.use(
@@ -106,16 +106,6 @@ app.post("/feedback", (req, res) => {
 app.use("/assets", express.static("./static"));
 app.use("/word", wordRouter);
 
-// app.get("/sound/:sound", (req, res) => {
-//   const sound = req.params.sound;
-//   res.header("Content-Disposition", "inline");
-//   res.header("Accept-Ranges", "bytes");
-//   res.sendFile(`${sound}`, {
-//     root: "./static",
-//     dotfiles: "deny",
-//   });
-// });
-
 app.use(Sentry.Handlers.errorHandler());
 
 app.use(
@@ -136,7 +126,7 @@ storage.io.on("connection", (socket) => {
   socket.on(
     "authenticate",
     (data: AuthenticateRequest, ack?: (res: string) => void) => {
-      const game = storage.games.find((g) => g.id == data.roomId);
+      const game = storage.games.word.find((g) => g.id == data.roomId);
       if (game) {
         const player = game.getPlayerWithName(data.nickname);
         if (player && player.authToken === data.authToken) {
@@ -147,12 +137,6 @@ storage.io.on("connection", (socket) => {
             game.syncPlayers();
             storage.saveGames();
             setTimeout(() => {
-              // console.log(
-              //   player.nickname,
-              //   Date.now(),
-              //   player.offlineAt,
-              //   player.offlineAt + 60 * 1000
-              // );
               if (
                 game.hasPlayerWithName(player.nickname) &&
                 Date.now() >= player.offlineAt + 1 * 60 * 1000 &&
