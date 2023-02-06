@@ -46,9 +46,10 @@ class Storage {
       .filesDownload({ path: `/${this.getFileName()}` })
       .catch((err) => console.log("Error loading games", err));
     if (games && games.result) {
-      const tempGames: Games = JSON.parse((<any>games.result).fileBinary);
-      this.games.word = plainToInstance(WordGame, tempGames.word);
-      this.games.minesweeper = plainToInstance(MsGame, tempGames.minesweeper);
+      const tempGames: Object[] = JSON.parse((<any>games.result).fileBinary);
+      this.games.word = plainToInstance(WordGame, tempGames);
+      this.games.minesweeper = [];
+      // this.games.minesweeper = plainToInstance(MsGame, tempGames.minesweeper);
     }
   }
 
