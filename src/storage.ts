@@ -29,12 +29,15 @@ class Storage {
     process.env.NODE_ENV === "development" ? "games-dev.json" : "games.json";
 
   saveGames() {
-    fs.writeFileSync(this.getFileName(), JSON.stringify(this.games, null, 2));
+    fs.writeFileSync(
+      this.getFileName(),
+      JSON.stringify(this.games.word, null, 2)
+    );
     dbx
       .filesUpload({
         path: `/${this.getFileName()}`,
         mode: { ".tag": "overwrite" },
-        contents: JSON.stringify(this.games, null, 2),
+        contents: JSON.stringify(this.games.word, null, 2),
       })
       .catch((err) => {
         console.log("Error uploading games", err);
