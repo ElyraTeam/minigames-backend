@@ -39,7 +39,7 @@ router.get("/stats", (req, res) => {
 
 router.get("/room/debug/:roomId", (req, res) => {
   const roomId = req.params.roomId;
-  const game = storage.games.word.find((g) => g.id == roomId);
+  const game = storage.getGame(roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
@@ -64,8 +64,7 @@ router.post("/room/create", (req, res) => {
   const roomId = nanoid(8);
   const game = new WordGame(roomId, body.nickname, body.options);
   game.createdAt = new Date().toISOString();
-  storage.games.word.push(game);
-  storage.saveGames();
+  storage.createGame(game);
 
   return res.status(200).json({ roomId });
 });
@@ -74,7 +73,7 @@ router.post("/room/join/:roomId", (req, res) => {
   const roomId = req.params.roomId;
   const { nickname } = req.body as { nickname: string };
 
-  const game = storage.games.word.find((g) => g.id == roomId);
+  const game = storage.getGame(roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
@@ -131,7 +130,7 @@ router.post("/room/leave/:roomId", (req, res) => {
   const roomId = req.params.roomId;
   const { nickname } = req.body as { nickname: string };
 
-  const game = storage.games.word.find((g) => g.id == roomId);
+  const game = storage.getGame(roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
@@ -164,7 +163,7 @@ router.post("/room/kick/:roomId", (req, res) => {
     toKickNickname: string;
   };
 
-  const game = storage.games.word.find((g) => g.id == roomId);
+  const game = storage.getGame(roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
@@ -208,7 +207,7 @@ router.post("/room/options/:roomId", (req, res) => {
     options: WordRoomOptions;
   };
 
-  const game = storage.games.word.find((g) => g.id == roomId);
+  const game = storage.getGame(roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);

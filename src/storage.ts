@@ -44,6 +44,15 @@ class Storage {
     }
   }
 
+  getGame(id: string) {
+    return this.games.word.find((g) => g.id == id);
+  }
+
+  createGame(game: WordGame) {
+    this.games.word.push(game);
+    this.saveGames();
+  }
+
   saveFeedbacks() {
     minigames_db.collection("feedbacks").insertMany(this.feedbacks);
   }

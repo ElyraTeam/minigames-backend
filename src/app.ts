@@ -119,7 +119,7 @@ storage.io.on("connection", (socket) => {
   socket.on(
     "authenticate",
     (data: AuthenticateRequest, ack?: (res: string) => void) => {
-      const game = storage.games.word.find((g) => g.id == data.roomId);
+      const game = storage.getGame(data.roomId);
       if (game) {
         const player = game.getPlayerWithName(data.nickname);
         if (player && player.authToken === data.authToken) {

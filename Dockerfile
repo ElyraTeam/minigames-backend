@@ -35,7 +35,7 @@ RUN pnpm prune --prod
 RUN pnpm add -g pm2
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
-CMD [ "pm2-runtime", "start", "dist/app.js", "-i", "max" ]
+CMD [ "pm2-runtime", "start", "dist/app.js", "-i", "1" ]
 
 FROM source AS dev
 USER node
