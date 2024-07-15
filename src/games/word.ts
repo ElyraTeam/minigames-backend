@@ -108,7 +108,9 @@ export const registerPlayerSocket = (
           roundData.playerValues[p.nickname] = values;
           //Check if every player sent their data
           if (
-            Object.entries(roundData.playerValues).length >= game.players.length
+            Object.entries(roundData.playerValues).length >=
+              game.players.length &&
+            game.state != State.VOTING
           ) {
             //Start voting process
             game.currentVotingCategory = 0;
