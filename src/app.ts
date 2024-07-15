@@ -14,7 +14,6 @@ import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 import wordRouter from "./routes/wordRoutes.js";
 import storage from "./storage.js";
-import { nanoid } from "nanoid";
 import { AuthenticateRequest } from "./models/word/socket.js";
 import { registerPlayerSocket } from "./games/word.js";
 import { State } from "./models/word/game.js";
