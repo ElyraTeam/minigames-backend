@@ -1,0 +1,30 @@
+version: "3"
+services:
+  app:
+    init: true
+    # command: "pm2-runtime start dist/app.js -i max"
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod
+    ports:
+      - "$PORT:$PORT"
+    env_file:
+      - .env
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:${PORT}/ || exit 1
+      interval: 5m
+      timeout: 3s
+      retries: 3
+  # redis:
+  #   image: redis:latest
+  #   restart: always
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - /path/to/local/dаta:/root/redis
+  #     - /path/to/local/redis.conf:/usr/local/etc/redis/redis.conf
+  #   environment:
+  #     - REDIS_PASSWORD=my-password
+  #     - REDIS_PORT=6379
+  #     - REDIS_DATABASES=16

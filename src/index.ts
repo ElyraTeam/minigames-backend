@@ -10,7 +10,7 @@ import hpp from "hpp";
 import cors from "cors";
 import morgan from "morgan";
 import * as Sentry from "@sentry/node";
-import * as Tracing from "@sentry/tracing";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 import wordRouter from "./routes/wordRoutes.js";
 import storage from "./storage.js";
@@ -25,12 +25,9 @@ const http = createServer(app);
 
 Sentry.init({
   dsn: "https://9bdafc7f662f41f5bc0c846024ec92f4@o260487.ingest.sentry.io/6179839",
-  integrations: [
-    new Sentry.Integrations.Http({ tracing: true }),
-    new Tracing.Integrations.Express({ app }),
-  ],
-
+  integrations: [nodeProfilingIntegration()],
   tracesSampleRate: 1.0,
+  profilesSampleRate: 1.0,
 });
 
 const corsOptions: cors.CorsOptions = {
@@ -83,9 +80,6 @@ app.use(morgan("combined"));
 //   next();
 // });
 
-app.use(Sentry.Handlers.requestHandler());
-app.use(Sentry.Handlers.tracingHandler());
-
 app.get("/", (req, res) => {
   res.status(200).send("All good!");
 });
@@ -106,7 +100,7 @@ app.post("/feedback", (req, res) => {
 app.use("/assets", express.static("./static"));
 app.use("/word", wordRouter);
 
-app.use(Sentry.Handlers.errorHandler());
+Sentry.setupExpressErrorHandler(app);
 
 app.use(
   (

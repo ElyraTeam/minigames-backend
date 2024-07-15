@@ -1,17 +1,15 @@
 import { Server } from "socket.io";
 import { WordGame } from "./models/word/game.js";
-import fs from "fs";
-import { Dropbox } from "dropbox";
 import { plainToInstance } from "class-transformer";
 import { Feedback } from "./models/feedback.js";
 import { MsGame } from "./models/minesweeper/game.js";
+import { minigames_db } from "./db.js";
 
 interface Games {
   word: WordGame[];
   minesweeper: MsGame[];
 }
 
-const dbx = new Dropbox({ accessToken: process.env.DBX_TOKEN });
 class Storage {
   public games: Games = {
     word: [],
@@ -25,56 +23,38 @@ class Storage {
     this.saveGames();
   }
 
-  private getFileName = () =>
-    process.env.NODE_ENV === "development" ? "games-dev.json" : "games.json";
-
   saveGames() {
-    fs.writeFileSync(
-      this.getFileName(),
-      JSON.stringify(this.games.word, null, 2)
-    );
-    dbx
-      .filesUpload({
-        path: `/${this.getFileName()}`,
-        mode: { ".tag": "overwrite" },
-        contents: JSON.stringify(this.games.word, null, 2),
-      })
-      .catch((err) => {
-        console.log("Error uploading games", err);
-      });
+    for (const game of this.games.word) {
+      minigames_db
+        .collection("games")
+        .updateOne({ id: game.id }, { $set: game }, { upsert: true });
+    }
   }
 
   async loadGames() {
-    const games = await dbx
-      .filesDownload({ path: `/${this.getFileName()}` })
-      .catch((err) => console.log("Error loading games", err));
-    if (games && games.result) {
-      const tempGames: Object[] = JSON.parse((<any>games.result).fileBinary);
-      this.games.word = plainToInstance(WordGame, tempGames);
+    const games = await minigames_db.collection("games").find();
+
+    if (games) {
+      for await (const game of games) {
+        this.games.word.push(plainToInstance(WordGame, game));
+      }
+
       this.games.minesweeper = [];
       // this.games.minesweeper = plainToInstance(MsGame, tempGames.minesweeper);
     }
   }
 
   saveFeedbacks() {
-    fs.writeFileSync("feedbacks.json", JSON.stringify(this.feedbacks, null, 2));
-    dbx
-      .filesUpload({
-        path: "/feedbacks.json",
-        mode: { ".tag": "overwrite" },
-        contents: JSON.stringify(this.feedbacks, null, 2),
-      })
-      .catch((err) => {
-        console.log("Error uploading feedbacks", err);
-      });
+    minigames_db.collection("feedbacks").insertMany(this.feedbacks);
   }
 
   async loadFeedbacks() {
-    const feedbacks = await dbx
-      .filesDownload({ path: "/feedbacks.json" })
-      .catch((err) => console.log("Error loading feedbacks", err));
-    if (feedbacks && feedbacks.result) {
-      this.feedbacks = JSON.parse((<any>feedbacks.result).fileBinary);
+    const feedbacks = await minigames_db.collection("feedbacks").find();
+
+    if (feedbacks) {
+      for await (const f of feedbacks) {
+        this.feedbacks.push(f as any);
+      }
     }
   }
 }

@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import storage from "../../storage.js";
 import { findMajority } from "../../utils/utils.js";
 import { ChatMessage } from "./socket.js";
@@ -38,6 +39,7 @@ export interface RoundData {
 }
 
 export class WordGame {
+  @Type(() => WordPlayer)
   public players: WordPlayer[] = [];
   public currentRound = 1;
   public currentLetter: string = "";
