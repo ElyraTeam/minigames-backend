@@ -23,16 +23,16 @@ class Storage {
     this.saveGames();
   }
 
-  saveGames() {
+  async saveGames() {
     for (const game of this.games.word) {
-      minigames_db
-        .collection("games")
+      await minigames_db
+        .collection("words_games")
         .updateOne({ id: game.id }, { $set: game }, { upsert: true });
     }
   }
 
   async loadGames() {
-    const games = await minigames_db.collection("games").find();
+    const games = await minigames_db.collection("words_games").find();
 
     if (games) {
       for await (const game of games) {
