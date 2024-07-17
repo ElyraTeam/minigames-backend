@@ -72,10 +72,25 @@ router.post("/room/create", (req, res) => {
 //check room exists
 router.get("/room/check/:roomId", (req, res) => {
   const roomId = req.params.roomId;
+  const nickname = req.query.nickname;
   const game = storage.getGame(roomId);
 
   if (!game) {
     return res.status(404).json(errors.roomNotFound);
+  }
+
+  if (nickname) {
+    const foundPlayer = game.getPlayerWithName(nickname as string);
+    if (foundPlayer) {
+      if (foundPlayer.sessionId != req.session!.id) {
+        return res.status(403).json(errors.nicknameInUse);
+      } else if (
+        foundPlayer.sessionId == req.session!.id &&
+        foundPlayer.online
+      ) {
+        return res.status(403).json(errors.alreadyInRoom);
+      }
+    }
   }
 
   return res.status(200).json({ roomId });
