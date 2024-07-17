@@ -2,6 +2,7 @@ import { Type } from "class-transformer";
 import storage from "../../storage.js";
 import { findMajority } from "../../utils/utils.js";
 import { ChatMessage } from "./socket.js";
+import { nanoid } from "nanoid";
 
 export interface WordRoomOptions {
   rounds: number;
@@ -221,6 +222,7 @@ export class WordGame {
 
   chat(sender: string, message: string, font: "normal" | "bold" = "normal") {
     storage.io.to(this.id).emit("chat", {
+      id: nanoid(),
       type: sender === "system" ? "system" : "player",
       sender,
       message,

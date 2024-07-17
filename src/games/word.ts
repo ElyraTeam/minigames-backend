@@ -16,6 +16,8 @@ export const registerPlayerSocket = (
   player: Player
 ) => {
   socket.on("chat", (msg) => {
+    //check if player is in game
+    if (!game.players.find((p) => p.authToken == player.authToken)) return;
     game.chat(player.nickname, msg);
   });
 

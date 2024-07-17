@@ -69,6 +69,18 @@ router.post("/room/create", (req, res) => {
   return res.status(200).json({ roomId });
 });
 
+//check room exists
+router.get("/room/check/:roomId", (req, res) => {
+  const roomId = req.params.roomId;
+  const game = storage.getGame(roomId);
+
+  if (!game) {
+    return res.status(404).json(errors.roomNotFound);
+  }
+
+  return res.status(200).json({ roomId });
+});
+
 router.post("/room/join/:roomId", (req, res) => {
   const roomId = req.params.roomId;
   const { nickname } = req.body as { nickname: string };

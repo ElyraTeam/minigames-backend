@@ -11,6 +11,7 @@ export interface CategoryVoteData {
 }
 
 export interface ChatMessage {
+  id: string;
   type: "system" | "player";
   sender: string;
   message: string;
