@@ -122,6 +122,7 @@ storage.io.on("connection", (socket) => {
       const game = storage.getGame(data.roomId);
       if (game) {
         const player = game.getPlayerWithName(data.nickname);
+
         if (player && player.authToken === data.authToken) {
           socket.on("disconnect", () => {
             player.socketId = undefined;
@@ -129,9 +130,11 @@ storage.io.on("connection", (socket) => {
             player.offlineAt = Date.now();
             game.syncPlayers();
             storage.saveGames();
+
             setTimeout(() => {
               if (
                 game.hasPlayerWithName(player.nickname) &&
+                player.offlineAt != 0 &&
                 Date.now() >= player.offlineAt + 1 * 60 * 1000 &&
                 player.online == false &&
                 player.socketId == undefined
@@ -141,6 +144,7 @@ storage.io.on("connection", (socket) => {
                   "system",
                   "تم طرد " + player.nickname + " لعدم النشاط."
                 );
+                game.sync();
                 game.syncPlayers();
                 storage.saveGames();
               }
@@ -148,6 +152,7 @@ storage.io.on("connection", (socket) => {
           });
 
           socket.on("ping", (cb) => {
+            player.offlineAt = 0;
             if (typeof cb === "function") cb();
           });
 
