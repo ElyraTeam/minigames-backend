@@ -1,9 +1,9 @@
-import { Type } from "class-transformer";
-import storage from "../../storage.js";
-import { findMajority } from "../../utils/utils.js";
-import { ChatMessage } from "./socket.js";
-import { nanoid } from "nanoid";
-import { BaseGame, BasePlayer, GameId } from "../base.js";
+import { Type } from 'class-transformer';
+import storage from '../../storage.js';
+import { findMajority } from '../../utils/utils.js';
+import { ChatMessage } from './socket.js';
+import { nanoid } from 'nanoid';
+import { BaseGame, BasePlayer, GameId } from '../base.js';
 
 export interface WordRoomOptions {
   rounds: number;
@@ -27,43 +27,43 @@ export type Votes = { [playerId: string]: { [k: string]: number } };
 export type ClientVotes = { [key: string]: { [k: string]: number } };
 
 export const DEFAULT_CATEGORIES_ARABIC = [
-  "ولد",
-  "بنت",
-  "حيوان",
-  "جماد",
-  "اكلة",
-  "نبات",
-  "بلد",
+  'ولد',
+  'بنت',
+  'حيوان',
+  'جماد',
+  'اكلة',
+  'نبات',
+  'بلد',
 ];
 export const CHARS_ARABIC: string[] = [
-  "أ",
-  "ب",
-  "ت",
-  "ث",
-  "ج",
-  "ح",
-  "خ",
-  "د",
-  "ذ",
-  "ر",
-  "ز",
-  "س",
-  "ش",
-  "ص",
-  "ض",
-  "ط",
-  "ظ",
-  "ع",
-  "غ",
-  "ف",
-  "ق",
-  "ك",
-  "ل",
-  "م",
-  "ن",
-  "هـ",
-  "و",
-  "ى",
+  'أ',
+  'ب',
+  'ت',
+  'ث',
+  'ج',
+  'ح',
+  'خ',
+  'د',
+  'ذ',
+  'ر',
+  'ز',
+  'س',
+  'ش',
+  'ص',
+  'ض',
+  'ط',
+  'ظ',
+  'ع',
+  'غ',
+  'ف',
+  'ق',
+  'ك',
+  'ل',
+  'م',
+  'ن',
+  'هـ',
+  'و',
+  'ى',
 ];
 
 export interface RoundData {
@@ -85,14 +85,14 @@ export class WordGame implements BaseGame {
   @Type(() => WordPlayer)
   public players: WordPlayer[] = [];
   public currentRound = 1;
-  public currentLetter: string = "";
+  public currentLetter: string = '';
   public state: State = State.LOBBY;
   public currentVotingCategory: number = 0;
   public doneLetters: string[] = [];
   public kickedPlayerSessions: string[] = [];
   public stoppedAt: number = 0;
   public createdAt: Date = new Date();
-  public gameId: GameId = "word";
+  public gameId: GameId = 'word';
 
   public roundData: { [key: number]: RoundData | undefined } = {};
 
@@ -113,7 +113,7 @@ export class WordGame implements BaseGame {
 
   reset() {
     this.state = State.LOBBY;
-    this.currentLetter = "";
+    this.currentLetter = '';
     this.doneLetters = [];
     this.roundData = {};
     this.currentVotingCategory = 0;
@@ -168,11 +168,11 @@ export class WordGame implements BaseGame {
 
     if (this.options.categories[this.currentVotingCategory]) {
       this.chat(
-        "system",
+        'system',
         `بداية التصويت لـ(${
           this.options.categories[this.currentVotingCategory]
         })`,
-        "bold"
+        'bold'
       );
     }
   }
@@ -210,7 +210,7 @@ export class WordGame implements BaseGame {
           this.currentRound++;
         }
 
-        this.currentLetter = "";
+        this.currentLetter = '';
         this.syncRoom();
       } else {
         this.sendNextCategoryForVoting();
@@ -221,7 +221,7 @@ export class WordGame implements BaseGame {
   }
 
   sendNextCategoryForVoting() {
-    this.toAllPlayers().emit("start-vote", this.getCurrentCategoryVoteData());
+    this.toAllPlayers().emit('start-vote', this.getCurrentCategoryVoteData());
   }
 
   /**
@@ -229,7 +229,7 @@ export class WordGame implements BaseGame {
    * State includes: current round, current letter, current state, stop clicker
    */
   syncRoom() {
-    storage.io.to(this.id).emit("sync", {
+    storage.io.to(this.id).emit('sync', {
       id: this.id,
       state: this.state,
       ownerId: this.ownerId,
@@ -240,14 +240,14 @@ export class WordGame implements BaseGame {
   }
 
   syncOptions() {
-    storage.io.to(this.id).emit("options", {
+    storage.io.to(this.id).emit('options', {
       id: this.id,
       options: this.options,
     });
   }
 
   syncPlayers() {
-    storage.io.to(this.id).emit("players", {
+    storage.io.to(this.id).emit('players', {
       id: this.id,
       players: this.players.map((p) => ({
         id: p.sessionId,
@@ -266,23 +266,23 @@ export class WordGame implements BaseGame {
     this.kickedPlayerSessions.push(toKick.sessionId);
     this.removePlayerLogic(toKick.sessionId);
 
-    this.chat("system", `تم طرد ${toKick.nickname}.`);
+    this.chat('system', `تم طرد ${toKick.nickname}.`);
 
-    toKick.getSocket()?.emit("kick", "تم طردك من الغرفة.");
+    toKick.getSocket()?.emit('kick', 'تم طردك من الغرفة.');
     toKick.getSocket()?.disconnect(true);
   }
 
   leave(toLeave: WordPlayer) {
     this.removePlayerLogic(toLeave.sessionId);
-    this.chat("system", `${toLeave.nickname} غادر.`);
+    this.chat('system', `${toLeave.nickname} غادر.`);
 
     toLeave.getSocket()?.disconnect(true);
   }
 
-  chat(sender: string, message: string, font: "normal" | "bold" = "normal") {
-    storage.io.to(this.id).emit("chat", {
+  chat(sender: string, message: string, font: 'normal' | 'bold' = 'normal') {
+    storage.io.to(this.id).emit('chat', {
       id: nanoid(),
-      type: sender === "system" ? "system" : "player",
+      type: sender === 'system' ? 'system' : 'player',
       sender,
       message,
       font,
@@ -309,14 +309,14 @@ export class WordGame implements BaseGame {
 
   updateVoteCount() {
     this.toAllPlayers().emit(
-      "update-vote-count",
+      'update-vote-count',
       this.roundData[this.currentRound]?.confirmedVotes.length ?? 0
     );
   }
 
   updatePlayerVotes() {
     this.toAllPlayers().emit(
-      "player-votes",
+      'player-votes',
       this.roundData[this.currentRound]?.clientVotes ?? {}
     );
   }
@@ -401,8 +401,9 @@ export class WordGame implements BaseGame {
         if (foundPlayer.sessionId == this.ownerId) {
           const newOwner = this.players[0];
           this.ownerId = newOwner.sessionId;
+          newOwner.ready = true;
 
-          this.chat("system", `اصبح ${newOwner.nickname} المسؤول.`);
+          this.chat('system', `اصبح ${newOwner.nickname} المسؤول.`);
         }
       }
     }

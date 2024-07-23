@@ -1,8 +1,8 @@
-import express from "express";
-import * as basicAuth from "express-basic-auth";
-import { nanoid } from "nanoid";
-import env from "../env.js";
-import { GameStats } from "../models/models.js";
+import express from 'express';
+import * as basicAuth from 'express-basic-auth';
+import { nanoid } from 'nanoid';
+import env from '../env.js';
+import { GameStats } from '../models/models.js';
 import {
   CHARS_ARABIC,
   DEFAULT_CATEGORIES_ARABIC,
@@ -10,9 +10,9 @@ import {
   WordGame,
   WordPlayer,
   WordRoomOptions,
-} from "../models/word/game.js";
-import storage from "../storage.js";
-import * as errors from "../utils/errors.js";
+} from '../models/word/game.js';
+import storage from '../storage.js';
+import * as errors from '../utils/errors.js';
 const router = express.Router();
 
 const authOptions: basicAuth.BasicAuthMiddlewareOptions = {
@@ -22,7 +22,7 @@ const authOptions: basicAuth.BasicAuthMiddlewareOptions = {
   },
 };
 
-router.get("/stats", basicAuth.default(authOptions), (req, res) => {
+router.get('/stats', basicAuth.default(authOptions), (req, res) => {
   const stats: GameStats = {
     gameCount: storage.wordStorage.getGames().length,
     playerCount: storage.wordStorage
@@ -33,7 +33,7 @@ router.get("/stats", basicAuth.default(authOptions), (req, res) => {
 });
 
 router.get(
-  "/room/debug/:roomId",
+  '/room/debug/:roomId',
   basicAuth.default(authOptions),
   (req, res) => {
     const roomId = req.params.roomId;
@@ -43,12 +43,12 @@ router.get(
       return res.status(404).json(errors.roomNotFound);
     }
 
-    res.header("Content-Type", "application/json");
+    res.header('Content-Type', 'application/json');
     return res.send(game.toJson());
   }
 );
 
-router.post("/room/create", (req, res) => {
+router.post('/room/create', (req, res) => {
   const defaultOptions: WordRoomOptions = {
     maxPlayers: 4,
     categories: DEFAULT_CATEGORIES_ARABIC,
@@ -65,7 +65,7 @@ router.post("/room/create", (req, res) => {
 });
 
 //check room exists
-router.get("/room/check/:roomId", (req, res) => {
+router.get('/room/check/:roomId', (req, res) => {
   const roomId = req.params.roomId;
   const nickname = req.query.nickname;
   const game = storage.wordStorage.getGame(roomId);
@@ -90,7 +90,7 @@ router.get("/room/check/:roomId", (req, res) => {
   return res.status(200).json({ roomId });
 });
 
-router.post("/room/join/:roomId", (req, res) => {
+router.post('/room/join/:roomId', (req, res) => {
   const roomId = req.params.roomId;
   const { nickname } = req.body as { nickname: string };
 
@@ -130,13 +130,16 @@ router.post("/room/join/:roomId", (req, res) => {
     }
 
     player = new WordPlayer(nickname, req.session!.id!, authToken);
+    if (game.ownerId === player.sessionId) {
+      player.ready = true;
+    }
     game.players.push(player);
   }
 
   if (reconnect) {
-    game.chat("system", `عاد ${player.nickname}.`);
+    game.chat('system', `عاد ${player.nickname}.`);
   } else {
-    game.chat("system", `انضم ${player.nickname}.`);
+    game.chat('system', `انضم ${player.nickname}.`);
   }
 
   player.setAuthToken(authToken);
@@ -154,7 +157,7 @@ router.post("/room/join/:roomId", (req, res) => {
   });
 });
 
-router.post("/room/leave/:roomId", (req, res) => {
+router.post('/room/leave/:roomId', (req, res) => {
   const roomId = req.params.roomId;
 
   const game = storage.wordStorage.getGame(roomId);
@@ -177,7 +180,7 @@ router.post("/room/leave/:roomId", (req, res) => {
   return res.status(204).end();
 });
 
-router.post("/room/kick/:roomId", (req, res) => {
+router.post('/room/kick/:roomId', (req, res) => {
   const roomId = req.params.roomId;
   const { toKickId } = req.body as {
     toKickId: string;
