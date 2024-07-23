@@ -45,7 +45,7 @@ storage.io = new Server(http, {
 
 const PORT = env.PORT || 5000;
 
-app.set("trust proxy", "loopback");
+app.set("trust proxy", true);
 app.use(
   helmet({
     crossOriginEmbedderPolicy: false,
