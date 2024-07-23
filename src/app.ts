@@ -119,7 +119,6 @@ storage.io.on("connection", (socket) => {
         const player = gameRoom.getPlayerBySessionId(
           (socket.request as any).session.id
         );
-
         //Word Specific
         if (
           player &&
@@ -176,7 +175,7 @@ storage.io.on("connection", (socket) => {
             gameRoom.updateVoteCount();
           }
 
-          gameRoom.sync();
+          gameRoom.syncRoom();
           gameRoom.syncOptions();
           gameRoom.syncPlayers();
           storage.saveGames();
@@ -189,19 +188,17 @@ storage.io.on("connection", (socket) => {
   );
 });
 
-function loadData() {
-  console.log("Loading games...");
-  storage
-    .loadGames()
-    .then(() => storage.loadFeedbacks())
-    .then(() => startServer());
-}
+const main = async () => {
+  console.log("Loading data...");
+  await Promise.all([storage.loadGames(), storage.loadFeedbacks()]);
+  startServer();
+};
 
-function startServer() {
+const startServer = () => {
   console.log("Starting server..");
   http.listen(PORT, () => {
     console.log("listening on *:" + PORT);
   });
-}
+};
 
-loadData();
+main();

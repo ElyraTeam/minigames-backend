@@ -7,6 +7,7 @@ import {
   Points,
   RoundData,
   State,
+  WordRoomOptions,
 } from "../models/word/game.js";
 import storage from "../storage.js";
 
@@ -17,26 +18,57 @@ export const registerPlayerSocket = (
 ) => {
   socket.on("chat", (msg) => {
     //check if player is in game
-    if (!game.players.find((p) => p.authToken == player.authToken)) return;
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
     game.chat(player.nickname, msg);
   });
 
   //Allow reusing lobby after game is over
   socket.on("reset-game", () => {
-    if (player.owner) {
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
+
+    if (player.sessionId == game.ownerId) {
       game.reset();
 
-      game.sync();
+      game.syncRoom();
       game.syncPlayers();
       storage.saveGames();
     }
   });
 
+  socket.on("ready", () => {
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
+    player.ready = !player.ready;
+    game.syncPlayers();
+  });
+
+  socket.on("options", (options: WordRoomOptions) => {
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
+    if (player.sessionId != game.ownerId) return;
+
+    if (
+      options.maxPlayers < game.players.length ||
+      options.categories.length == 0 ||
+      options.letters.length == 0 ||
+      options.maxPlayers < 2 ||
+      options.rounds < 1
+    ) {
+      return;
+    }
+
+    game.options = options;
+    game.syncRoom();
+    game.syncOptions();
+    storage.saveGames();
+  });
+
   socket.on("start-game", () => {
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
     //Make sure 2 or more players are ingame
     //Also make sure you are not above round limit
+    const allReady = game.players.every((p) => p.ready);
     if (
-      player.owner &&
+      allReady &&
+      player.sessionId == game.ownerId &&
       game.state == State.LOBBY &&
       game.players.length >= 2 &&
       game.currentRound <= game.options.rounds
@@ -51,7 +83,7 @@ export const registerPlayerSocket = (
         game.roundData[game.currentRound] = {
           round: game.currentRound,
           letter: game.currentLetter,
-          stopClicker: "",
+          stopClickerId: "",
           playerValues: {},
           finalPoints: {},
           confirmedVotes: [],
@@ -59,37 +91,39 @@ export const registerPlayerSocket = (
           clientVotes: {},
         };
 
-        game.sync();
+        game.syncRoom();
         storage.saveGames();
       }, 2200);
     }
   });
 
   socket.on("stop-game", () => {
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
     if (game.state != State.INGAME) return;
 
     const roundData = game.roundData[game.currentRound];
     if (!roundData) return;
 
-    roundData.stopClicker = player.nickname;
+    roundData.stopClickerId = player.sessionId;
 
     game.doneLetters.push(game.currentLetter);
     game.stoppedAt = Date.now();
     game.state = State.WAITING;
-    game.sync();
+    game.syncRoom();
     storage.saveGames();
 
     game.players.forEach((p) => {
       p.voted = false;
+      p.ready = false;
       p.lastRoundScore = 0;
 
-      const values: { [name: string]: string } = {};
+      const values: { [category: string]: string } = {};
       game.options.categories.forEach((cat) => {
         if (!values[cat]) {
           values[cat] = "";
         }
       });
-      roundData.playerValues[p.nickname] = values;
+      roundData.playerValues[p.sessionId] = values;
 
       //Values is a map of category => value
       p.getSocket()?.emit(
@@ -107,7 +141,7 @@ export const registerPlayerSocket = (
               values[cat] = "";
             });
           }
-          roundData.playerValues[p.nickname] = values;
+          roundData.playerValues[p.sessionId] = values;
           //Check if every player sent their data
           if (
             Object.entries(roundData.playerValues).length >=
@@ -118,7 +152,7 @@ export const registerPlayerSocket = (
             game.currentVotingCategory = 0;
             game.prepareNewCategoryVoting();
             game.state = State.VOTING;
-            game.sync();
+            game.syncRoom();
             storage.saveGames();
 
             game.sendNextCategoryForVoting();
@@ -138,24 +172,24 @@ export const registerPlayerSocket = (
     }
 
     game.players.forEach((p) => {
-      if (!roundData.clientVotes[p.nickname]) {
-        roundData.clientVotes[p.nickname] = {};
+      if (!roundData.clientVotes[p.sessionId]) {
+        roundData.clientVotes[p.sessionId] = {};
       }
     });
 
     //Cant vote for self lol
-    if (voteData[player.nickname]) {
-      delete voteData[player.nickname];
+    if (voteData[player.sessionId]) {
+      delete voteData[player.sessionId];
     }
 
-    if (!roundData.clientVotes[player.nickname]) {
-      roundData.clientVotes[player.nickname] = {};
+    if (!roundData.clientVotes[player.sessionId]) {
+      roundData.clientVotes[player.sessionId] = {};
     }
 
     Object.entries(voteData).forEach(([playerToVoteFor, val]) => {
       if (
-        game.hasPlayerWithName(playerToVoteFor) &&
-        playerToVoteFor !== player.nickname
+        game.hasPlayerWithSessionId(playerToVoteFor) &&
+        playerToVoteFor !== player.sessionId
       ) {
         //give 0 for empty values
         const playerVals = roundData.playerValues[playerToVoteFor]!;
@@ -165,7 +199,7 @@ export const registerPlayerSocket = (
         }
 
         if (val == 0 || val == 5 || val == 10) {
-          roundData.clientVotes[player.nickname][playerToVoteFor] = val;
+          roundData.clientVotes[player.sessionId][playerToVoteFor] = val;
         }
       }
     });
@@ -180,25 +214,25 @@ export const registerPlayerSocket = (
     const category = game.options.categories[game.currentVotingCategory];
     const roundData = game.roundData[game.currentRound];
     if (!roundData) return;
-    if (roundData.confirmedVotes.includes(player.nickname)) return; //disallow revoting
+    if (roundData.confirmedVotes.includes(player.sessionId)) return; //disallow revoting
 
     player.voted = true;
-    roundData.confirmedVotes.push(player.nickname);
+    roundData.confirmedVotes.push(player.sessionId);
 
     //get his final client votes and start adding
     if (roundData.clientVotes[player.nickname]) {
-      const playerVotes = roundData.clientVotes[player.nickname];
+      const playerVotes = roundData.clientVotes[player.sessionId];
 
       game.players.forEach((p) => {
-        if (!playerVotes[p.nickname] && p.nickname !== player.nickname) {
-          playerVotes[p.nickname] = 0;
+        if (!playerVotes[p.sessionId] && p.sessionId !== player.sessionId) {
+          playerVotes[p.sessionId] = 0;
         }
       });
 
       Object.keys(playerVotes).forEach((playerToVoteFor) => {
         if (
-          game.hasPlayerWithName(playerToVoteFor) &&
-          playerToVoteFor !== player.nickname
+          game.hasPlayerWithSessionId(playerToVoteFor) &&
+          playerToVoteFor !== player.sessionId
         ) {
           if (!roundData.votes[playerToVoteFor]) {
             roundData.votes[playerToVoteFor] = {};
@@ -208,7 +242,7 @@ export const registerPlayerSocket = (
             roundData.votes[playerToVoteFor][category] = {};
           }
 
-          roundData.votes[playerToVoteFor][category][player.nickname] =
+          roundData.votes[playerToVoteFor][category][player.sessionId] =
             playerVotes[playerToVoteFor];
         }
       });

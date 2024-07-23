@@ -1,17 +1,19 @@
 import express from "express";
-const router = express.Router();
 import * as basicAuth from "express-basic-auth";
-import * as errors from "../utils/errors.js";
 import { nanoid } from "nanoid";
+import env from "../env.js";
+import { GameStats } from "../models/models.js";
 import {
+  CHARS_ARABIC,
+  DEFAULT_CATEGORIES_ARABIC,
+  State,
   WordGame,
   WordPlayer,
   WordRoomOptions,
-  State,
 } from "../models/word/game.js";
 import storage from "../storage.js";
-import env from "../env.js";
-import { AllGamesStats, GameStats } from "../models/models.js";
+import * as errors from "../utils/errors.js";
+const router = express.Router();
 
 const authOptions: basicAuth.BasicAuthMiddlewareOptions = {
   challenge: true,
@@ -47,20 +49,17 @@ router.get(
 );
 
 router.post("/room/create", (req, res) => {
-  const body = req.body as { nickname: string; options: WordRoomOptions };
+  const body = req.body as { nickname: string };
 
-  if (
-    body.options.categories.length == 0 ||
-    body.options.letters.length == 0 ||
-    body.options.maxPlayers < 2 ||
-    body.options.rounds < 1
-  ) {
-    return res.status(403).json(errors.invalidRoomOptions);
-  }
+  const defaultOptions: WordRoomOptions = {
+    maxPlayers: 4,
+    categories: DEFAULT_CATEGORIES_ARABIC,
+    letters: CHARS_ARABIC,
+    rounds: 5,
+  };
 
   const roomId = nanoid(8);
-  const game = new WordGame(roomId, req.session!.id!, body.options);
-  game.createdAt = new Date().toISOString();
+  const game = new WordGame(roomId, req.session!.id!, defaultOptions);
   storage.wordStorage.addGame(game);
 
   return res.status(200).json({ roomId });
@@ -135,7 +134,9 @@ router.post("/room/join/:roomId", (req, res) => {
     game.players.push(player);
   }
 
-  if (!reconnect) {
+  if (reconnect) {
+    game.chat("system", `عاد ${player.nickname}.`);
+  } else {
     game.chat("system", `انضم ${player.nickname}.`);
   }
 
@@ -143,7 +144,7 @@ router.post("/room/join/:roomId", (req, res) => {
 
   storage.saveGames();
 
-  game.sync();
+  game.syncRoom();
   game.syncPlayers();
 
   return res.status(200).json({ roomId, roomOptions: game.options, authToken });
@@ -163,17 +164,11 @@ router.post("/room/leave/:roomId", (req, res) => {
     return res.status(404).json(errors.unknownPlayer);
   }
 
-  game.removePlayerLogic(req.session!.id!);
+  game.leave(foundPlayer);
   storage.saveGames();
 
-  if (foundPlayer.socketId) {
-    storage.io.sockets.sockets.get(foundPlayer.socketId)?.disconnect();
-  }
-
-  game.sync();
+  game.syncRoom();
   game.syncPlayers();
-
-  game.chat("system", `خرج ${foundPlayer.nickname}.`);
 
   return res.status(204).end();
 });
@@ -205,15 +200,10 @@ router.post("/room/kick/:roomId", (req, res) => {
   }
 
   game.kick(toKick);
-  game.removePlayer(toKick.sessionId);
-  game.kickedPlayerSessions.push(toKick.sessionId);
   storage.saveGames();
 
-  game.sync();
+  game.syncRoom();
   game.syncPlayers();
-
-  game.chat("system", `تم طرد ${toKick.nickname}.`);
-
   return res.status(204).end();
 });
 

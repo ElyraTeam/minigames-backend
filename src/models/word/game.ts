@@ -20,23 +20,63 @@ export enum State {
   GAME_OVER,
 }
 
-export type PlayerValues = { [name: string]: string };
-export type Points = { [name: string]: number };
-export type Votes = { [name: string]: { [k: string]: number } };
+export type PlayerValues = { [playerId: string]: string };
+export type Points = { [playerId: string]: number };
+export type Votes = { [playerId: string]: { [k: string]: number } };
 export type ClientVotes = { [key: string]: { [k: string]: number } };
+
+export const DEFAULT_CATEGORIES_ARABIC = [
+  "ولد",
+  "بنت",
+  "حيوان",
+  "جماد",
+  "اكلة",
+  "نبات",
+  "بلد",
+];
+export const CHARS_ARABIC: string[] = [
+  "أ",
+  "ب",
+  "ت",
+  "ث",
+  "ج",
+  "ح",
+  "خ",
+  "د",
+  "ذ",
+  "ر",
+  "ز",
+  "س",
+  "ش",
+  "ص",
+  "ض",
+  "ط",
+  "ظ",
+  "ع",
+  "غ",
+  "ف",
+  "ق",
+  "ك",
+  "ل",
+  "م",
+  "ن",
+  "هـ",
+  "و",
+  "ى",
+];
 
 export interface RoundData {
   round: number;
-  stopClicker: string;
+  stopClickerId: string;
   letter: string;
-  playerValues: { [name: string]: PlayerValues };
+  playerValues: { [playerId: string]: PlayerValues };
   finalPoints: Points;
   confirmedVotes: string[];
 
   /**
    * Final Votes
    */
-  votes: { [name: string]: Votes };
+  votes: { [playerId: string]: Votes };
   clientVotes: ClientVotes;
 }
 
@@ -50,7 +90,7 @@ export class WordGame implements BaseGame {
   public doneLetters: string[] = [];
   public kickedPlayerSessions: string[] = [];
   public stoppedAt: number = 0;
-  public createdAt: String = "";
+  public createdAt: Date = new Date();
   public gameId: GameId = "word";
 
   public roundData: { [key: number]: RoundData | undefined } = {};
@@ -170,7 +210,7 @@ export class WordGame implements BaseGame {
         }
 
         this.currentLetter = "";
-        this.sync();
+        this.syncRoom();
       } else {
         this.sendNextCategoryForVoting();
       }
@@ -183,13 +223,17 @@ export class WordGame implements BaseGame {
     this.toAllPlayers().emit("start-vote", this.getCurrentCategoryVoteData());
   }
 
-  sync() {
+  /**
+   * Syncs the room state to all players
+   * State includes: current round, current letter, current state, stop clicker
+   */
+  syncRoom() {
     storage.io.to(this.id).emit("sync", {
       id: this.id,
       state: this.state,
       currentRound: this.currentRound,
       currentLetter: this.currentLetter,
-      stopClicker: this.roundData[this.currentRound]?.stopClicker,
+      stopClicker: this.roundData[this.currentRound]?.stopClickerId,
     });
   }
 
@@ -204,21 +248,33 @@ export class WordGame implements BaseGame {
     storage.io.to(this.id).emit("players", {
       id: this.id,
       players: this.players.map((p) => ({
+        id: p.sessionId,
         nickname: p.nickname,
         online: p.online,
         owner: p.sessionId == this.ownerId,
         totalScore: p.totalScore,
         lastRoundScore: p.lastRoundScore,
         voted: p.voted,
+        ready: p.ready,
       })),
     });
   }
 
   kick(toKick: WordPlayer) {
-    if (toKick.socketId) {
-      toKick.getSocket()?.emit("kick", "تم طردك من الغرفة.");
-      toKick.getSocket()?.disconnect();
-    }
+    this.kickedPlayerSessions.push(toKick.sessionId);
+    this.removePlayerLogic(toKick.sessionId);
+
+    this.chat("system", `تم طرد ${toKick.nickname}.`);
+
+    toKick.getSocket()?.emit("kick", "تم طردك من الغرفة.");
+    toKick.getSocket()?.disconnect(true);
+  }
+
+  leave(toLeave: WordPlayer) {
+    this.removePlayerLogic(toLeave.sessionId);
+    this.chat("system", `${toLeave.nickname} غادر.`);
+
+    toLeave.getSocket()?.disconnect(true);
   }
 
   chat(sender: string, message: string, font: "normal" | "bold" = "normal") {
@@ -275,6 +331,10 @@ export class WordGame implements BaseGame {
     return this.players.some((p) => p.nickname === nickname);
   }
 
+  hasPlayerWithSessionId(sessionId: string) {
+    return this.players.some((p) => p.sessionId === sessionId);
+  }
+
   getPlayerByNickname(nickname: string) {
     return this.players.find((p) => p.nickname === nickname);
   }
@@ -283,7 +343,7 @@ export class WordGame implements BaseGame {
     return this.players.find((p) => p.sessionId === sessionId);
   }
 
-  removePlayer(sessionId: string) {
+  private removePlayer(sessionId: string) {
     const roundData = this.roundData[this.currentRound];
     if (roundData) {
       if (roundData.clientVotes[sessionId]) {
