@@ -62,9 +62,11 @@ class Storage {
   async saveGames() {
     //TODO make this universal
     for (const game of this.wordStorage.getGames()) {
+      const toSave: any = { ...game };
+      delete toSave._id;
       await minigames_db
         .collection("words_games")
-        .updateOne({ id: game.id }, { $set: game }, { upsert: true });
+        .updateOne({ id: game.id }, { $set: toSave }, { upsert: true });
     }
   }
 
@@ -78,8 +80,12 @@ class Storage {
     }
   }
 
-  saveFeedbacks() {
-    minigames_db.collection("feedbacks").insertMany(this.feedbacks);
+  async saveFeedbacks() {
+    for (const f of this.feedbacks) {
+      await minigames_db
+        .collection("feedbacks")
+        .updateOne({ _id: f._id }, { $set: f }, { upsert: true });
+    }
   }
 
   async loadFeedbacks() {

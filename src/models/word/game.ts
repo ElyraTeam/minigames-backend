@@ -10,6 +10,7 @@ export interface WordRoomOptions {
   letters: string[];
   categories: string[];
   maxPlayers: number;
+  isPrivate: boolean;
 }
 
 export enum State {
@@ -231,6 +232,7 @@ export class WordGame implements BaseGame {
     storage.io.to(this.id).emit("sync", {
       id: this.id,
       state: this.state,
+      ownerId: this.ownerId,
       currentRound: this.currentRound,
       currentLetter: this.currentLetter,
       stopClicker: this.roundData[this.currentRound]?.stopClickerId,

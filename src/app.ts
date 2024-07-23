@@ -17,7 +17,7 @@ import storage from "./storage.js";
 import { registerPlayerSocket } from "./games/word.js";
 import { State, WordGame, WordPlayer } from "./models/word/game.js";
 import { Feedback } from "./models/feedback.js";
-import env from "./env.js";
+import env, { isProd } from "./env.js";
 import { sessionMiddleware } from "./middlewares/sessionMiddlewares.js";
 import { AuthenticateRequest } from "./models/base.js";
 
@@ -61,8 +61,8 @@ app.use(cors(corsOptions));
 const cookieMiddleware = cookieSession({
   name: "session",
   secret: env.COOKIE_SECRET,
-  sameSite: "none",
-  secureProxy: true,
+  sameSite: "lax",
+  secure: isProd,
   maxAge: 604800000,
   httpOnly: true,
 });
@@ -116,9 +116,15 @@ storage.io.on("connection", (socket) => {
       const gameRoom = storage.getStorageForGame(gameId).getGame(data.roomId);
 
       if (gameRoom) {
+        console.log(
+          "Authenticating game",
+          gameRoom.id,
+          (socket.request as any).session
+        );
         const player = gameRoom.getPlayerBySessionId(
           (socket.request as any).session.id
         );
+        console.log("Authenticating player", player?.nickname);
         //Word Specific
         if (
           player &&

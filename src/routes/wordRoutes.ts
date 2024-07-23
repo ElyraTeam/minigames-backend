@@ -49,13 +49,12 @@ router.get(
 );
 
 router.post("/room/create", (req, res) => {
-  const body = req.body as { nickname: string };
-
   const defaultOptions: WordRoomOptions = {
     maxPlayers: 4,
     categories: DEFAULT_CATEGORIES_ARABIC,
     letters: CHARS_ARABIC,
     rounds: 5,
+    isPrivate: true,
   };
 
   const roomId = nanoid(8);
@@ -147,7 +146,12 @@ router.post("/room/join/:roomId", (req, res) => {
   game.syncRoom();
   game.syncPlayers();
 
-  return res.status(200).json({ roomId, roomOptions: game.options, authToken });
+  return res.status(200).json({
+    roomId,
+    roomOptions: game.options,
+    authToken,
+    playerId: player.sessionId,
+  });
 });
 
 router.post("/room/leave/:roomId", (req, res) => {
