@@ -3,6 +3,7 @@ import storage from "../../storage.js";
 import { findMajority } from "../../utils/utils.js";
 import { ChatMessage } from "./socket.js";
 import { nanoid } from "nanoid";
+import { BaseGame, BasePlayer, GameId } from "../base.js";
 
 export interface WordRoomOptions {
   rounds: number;
@@ -39,7 +40,7 @@ export interface RoundData {
   clientVotes: ClientVotes;
 }
 
-export class WordGame {
+export class WordGame implements BaseGame {
   @Type(() => WordPlayer)
   public players: WordPlayer[] = [];
   public currentRound = 1;
@@ -50,12 +51,13 @@ export class WordGame {
   public kickedPlayerSessions: string[] = [];
   public stoppedAt: number = 0;
   public createdAt: String = "";
+  public gameId: GameId = "word";
 
   public roundData: { [key: number]: RoundData | undefined } = {};
 
   constructor(
     public id: string,
-    public owner: string,
+    public ownerId: string,
     public options: WordRoomOptions
   ) {}
 
@@ -146,7 +148,7 @@ export class WordGame {
         if (v.length > 0) {
           maj = findMajority(v);
         }
-        const p = this.getPlayerWithName(nick);
+        const p = this.getPlayerByNickname(nick);
         if (p) {
           p.totalScore += maj;
           p.lastRoundScore += maj;
@@ -184,7 +186,6 @@ export class WordGame {
   sync() {
     storage.io.to(this.id).emit("sync", {
       id: this.id,
-      owner: this.owner,
       state: this.state,
       currentRound: this.currentRound,
       currentLetter: this.currentLetter,
@@ -205,7 +206,7 @@ export class WordGame {
       players: this.players.map((p) => ({
         nickname: p.nickname,
         online: p.online,
-        owner: p.owner,
+        owner: p.sessionId == this.ownerId,
         totalScore: p.totalScore,
         lastRoundScore: p.lastRoundScore,
         voted: p.voted,
@@ -274,36 +275,40 @@ export class WordGame {
     return this.players.some((p) => p.nickname === nickname);
   }
 
-  getPlayerWithName(nickname: string) {
+  getPlayerByNickname(nickname: string) {
     return this.players.find((p) => p.nickname === nickname);
   }
 
-  removePlayer(nickname: string) {
+  getPlayerBySessionId(sessionId: string) {
+    return this.players.find((p) => p.sessionId === sessionId);
+  }
+
+  removePlayer(sessionId: string) {
     const roundData = this.roundData[this.currentRound];
     if (roundData) {
-      if (roundData.clientVotes[nickname]) {
-        delete roundData.clientVotes[nickname];
+      if (roundData.clientVotes[sessionId]) {
+        delete roundData.clientVotes[sessionId];
       }
 
-      if (roundData.confirmedVotes.includes(nickname)) {
+      if (roundData.confirmedVotes.includes(sessionId)) {
         roundData.confirmedVotes = roundData.confirmedVotes.filter(
-          (n) => n !== nickname
+          (n) => n !== sessionId
         );
       }
 
-      if (roundData.votes[nickname]) {
-        delete roundData.votes[nickname];
+      if (roundData.votes[sessionId]) {
+        delete roundData.votes[sessionId];
       }
 
-      if (roundData.playerValues[nickname]) {
-        delete roundData.playerValues[nickname];
+      if (roundData.playerValues[sessionId]) {
+        delete roundData.playerValues[sessionId];
       }
 
       this.players.forEach((p) => {
-        if (p.nickname !== nickname && roundData.votes[p.nickname]) {
+        if (p.sessionId !== sessionId && roundData.votes[p.nickname]) {
           Object.keys(roundData.votes[p.nickname]).forEach((voteCat) => {
-            if (roundData.votes[p.nickname][voteCat][nickname]) {
-              delete roundData.votes[p.nickname][voteCat][nickname];
+            if (roundData.votes[p.nickname][voteCat][sessionId]) {
+              delete roundData.votes[p.nickname][voteCat][sessionId];
             }
           });
         }
@@ -316,51 +321,56 @@ export class WordGame {
       this.sendNextCategoryForVoting();
     }
 
-    this.players = this.players.filter((p) => p.nickname !== nickname);
+    this.players = this.players.filter((p) => p.sessionId !== sessionId);
     if (this.state == State.VOTING) {
       this.checkEveryoneVoted();
     }
   }
 
-  removePlayerLogic(nickname: string) {
-    const foundPlayer = this.getPlayerWithName(nickname);
+  removePlayerLogic(sessionId: string) {
+    const foundPlayer = this.getPlayerBySessionId(sessionId);
     if (foundPlayer) {
-      this.removePlayer(nickname);
+      this.removePlayer(sessionId);
       if (this.players.length == 0) {
         //last player, delete game;
-        storage.removeGame(this.id);
+        storage.wordStorage.removeGame(this.id);
       } else if (this.players.length > 0) {
         //find another owner, for now get next player
-        if (foundPlayer.owner) {
+        if (foundPlayer.sessionId == this.ownerId) {
           const newOwner = this.players[0];
-          newOwner.owner = true;
-          this.owner = newOwner.nickname;
+          this.ownerId = newOwner.sessionId;
 
-          this.chat("system", `اصبح ${this.owner} المسؤول.`);
+          this.chat("system", `اصبح ${newOwner.nickname} المسؤول.`);
         }
       }
     }
   }
 }
-export class WordPlayer {
-  public authToken?: string;
-  public online: boolean = false;
+export class WordPlayer extends BasePlayer {
   public totalScore = 0;
   public lastRoundScore = 0;
-  public socketId?: string;
   public voted: boolean = false;
-  public offlineAt = 0;
 
   constructor(
     public nickname: string,
-    public owner: boolean,
-    public sessionId: string
-  ) {}
+    public sessionId: string,
+    protected authToken: string
+  ) {
+    super(authToken, nickname, sessionId);
+  }
 
   getSocket() {
     if (!this.socketId) {
       return undefined;
     }
     return storage.io.sockets.sockets.get(this.socketId);
+  }
+
+  setAuthToken(authToken: string) {
+    this.authToken = authToken;
+  }
+
+  checkAuth(authToken: string) {
+    return this.authToken === authToken;
   }
 }

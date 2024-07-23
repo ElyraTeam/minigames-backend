@@ -14,10 +14,12 @@ import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 import wordRouter from "./routes/wordRoutes.js";
 import storage from "./storage.js";
-import { AuthenticateRequest } from "./models/word/socket.js";
 import { registerPlayerSocket } from "./games/word.js";
-import { State } from "./models/word/game.js";
+import { State, WordGame, WordPlayer } from "./models/word/game.js";
 import { Feedback } from "./models/feedback.js";
+import env from "./env.js";
+import { sessionMiddleware } from "./middlewares/sessionMiddlewares.js";
+import { AuthenticateRequest } from "./models/base.js";
 
 const app = express();
 const http = createServer(app);
@@ -41,7 +43,7 @@ storage.io = new Server(http, {
   cors: corsOptions,
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = env.PORT || 5000;
 
 app.set("trust proxy", "loopback");
 app.use(
@@ -55,29 +57,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(hpp());
 app.use(cors(corsOptions));
-app.use(
-  cookieSession({
-    name: "session",
-    secret: process.env.COOKIE_SECRET,
-    sameSite: "none",
-    secureProxy: true,
-    maxAge: 604800000,
-    httpOnly: true,
-  })
-);
+
+const cookieMiddleware = cookieSession({
+  name: "session",
+  secret: env.COOKIE_SECRET,
+  sameSite: "none",
+  secureProxy: true,
+  maxAge: 604800000,
+  httpOnly: true,
+});
+storage.io.engine.use(cookieMiddleware);
+app.use(cookieMiddleware);
 app.use(morgan("combined"));
 
-//Assign random id to each session
-// app.use((req: express.Request, res: express.Response, next) => {
-//   if (!req.session) {
-//     req.session = {};
-//   }
-
-//   if (!req.session.id) {
-//     req.session.id = nanoid();
-//   }
-//   next();
-// });
+app.use(sessionMiddleware);
 
 app.get("/", (req, res) => {
   res.status(200).send("All good!");
@@ -119,36 +112,46 @@ storage.io.on("connection", (socket) => {
   socket.on(
     "authenticate",
     (data: AuthenticateRequest, ack?: (res: string) => void) => {
-      const game = storage.getGame(data.roomId);
-      if (game) {
-        const player = game.getPlayerWithName(data.nickname);
+      const gameId = data.game;
+      const gameRoom = storage.getStorageForGame(gameId).getGame(data.roomId);
 
-        if (player && player.authToken === data.authToken) {
+      if (gameRoom) {
+        const player = gameRoom.getPlayerBySessionId(
+          (socket.request as any).session.id
+        );
+
+        //Word Specific
+        if (
+          player &&
+          player.checkAuth(data.authToken) &&
+          gameRoom instanceof WordGame &&
+          player instanceof WordPlayer
+        ) {
           socket.on("disconnect", () => {
             player.socketId = undefined;
             player.online = false;
             player.offlineAt = Date.now();
-            game.syncPlayers();
+            gameRoom.syncPlayers();
             storage.saveGames();
 
-            setTimeout(() => {
-              if (
-                game.hasPlayerWithName(player.nickname) &&
-                player.offlineAt != 0 &&
-                Date.now() >= player.offlineAt + 1 * 60 * 1000 &&
-                player.online == false &&
-                player.socketId == undefined
-              ) {
-                game.removePlayerLogic(player.nickname);
-                game.chat(
-                  "system",
-                  "تم طرد " + player.nickname + " لعدم النشاط."
-                );
-                game.sync();
-                game.syncPlayers();
-                storage.saveGames();
-              }
-            }, 1 * 60 * 1000);
+            //   setTimeout(() => {
+            //     if (
+            //       game.hasPlayerWithName(player.nickname) &&
+            //       player.offlineAt != 0 &&
+            //       Date.now() >= player.offlineAt + 1 * 60 * 1000 &&
+            //       player.online == false &&
+            //       player.socketId == undefined
+            //     ) {
+            //       game.removePlayerLogic(player.nickname);
+            //       game.chat(
+            //         "system",
+            //         "تم طرد " + player.nickname + " لعدم النشاط."
+            //       );
+            //       game.sync();
+            //       game.syncPlayers();
+            //       storage.saveGames();
+            //     }
+            //   }, 1 * 60 * 1000);
           });
 
           socket.on("ping", (cb) => {
@@ -163,19 +166,19 @@ storage.io.on("connection", (socket) => {
           socket.data.nickname = player.nickname;
           socket.data.sessionId = player.sessionId;
 
-          registerPlayerSocket(socket, game, player);
+          registerPlayerSocket(socket, gameRoom, player);
 
-          socket.join(game.id);
+          socket.join(gameRoom.id);
 
-          if (game.state == State.VOTING) {
-            socket.emit("start-vote", game.getCurrentCategoryVoteData());
-            game.updatePlayerVotes();
-            game.updateVoteCount();
+          if (gameRoom.state == State.VOTING) {
+            socket.emit("start-vote", gameRoom.getCurrentCategoryVoteData());
+            gameRoom.updatePlayerVotes();
+            gameRoom.updateVoteCount();
           }
 
-          game.sync();
-          game.syncOptions();
-          game.syncPlayers();
+          gameRoom.sync();
+          gameRoom.syncOptions();
+          gameRoom.syncPlayers();
           storage.saveGames();
           if (ack) {
             ack("good");

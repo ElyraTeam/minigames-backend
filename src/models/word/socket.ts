@@ -1,9 +1,3 @@
-export interface AuthenticateRequest {
-  roomId: string;
-  nickname: string;
-  authToken: string;
-}
-
 export interface CategoryVoteData {
   category: string;
   values: Map<string, string>;
