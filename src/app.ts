@@ -64,7 +64,7 @@ const cookieMiddleware = cookieSession({
   secure: isProd,
   maxAge: 604800000,
   httpOnly: true,
-  sameSite: "lax",
+  sameSite: isProd ? "none" : "lax",
 });
 storage.io.engine.use(cookieMiddleware);
 app.use(cookieMiddleware);
