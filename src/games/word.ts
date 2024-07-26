@@ -120,13 +120,15 @@ export const registerPlayerSocket = (
       }
       p.lastRoundScore = 0;
 
-      const values: { [category: string]: string } = {};
-      game.options.categories.forEach((cat) => {
-        if (!values[cat]) {
-          values[cat] = "";
-        }
-      });
-      roundData.playerValues[p.sessionId] = values;
+      if (p.online === false) {
+        const values: { [category: string]: string } = {};
+        game.options.categories.forEach((cat) => {
+          if (!values[cat]) {
+            values[cat] = "";
+          }
+        });
+        roundData.playerValues[p.sessionId] = values;
+      }
 
       //Values is a map of category => value
       p.getSocket()?.emit(
