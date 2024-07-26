@@ -1,5 +1,5 @@
-import { Socket } from 'socket.io';
-import { stringify } from 'uuid';
+import { Socket } from "socket.io";
+import { stringify } from "uuid";
 import {
   WordGame as Game,
   WordPlayer as Player,
@@ -8,22 +8,22 @@ import {
   RoundData,
   State,
   WordRoomOptions,
-} from '../models/word/game.js';
-import storage from '../storage.js';
+} from "../models/word/game.js";
+import storage from "../storage.js";
 
 export const registerPlayerSocket = (
   socket: Socket,
   game: Game,
   player: Player
 ) => {
-  socket.on('chat', (msg) => {
+  socket.on("chat", (msg) => {
     //check if player is in game
     if (!game.getPlayerBySessionId(player.sessionId)) return;
     game.chat(player.nickname, msg);
   });
 
   //Allow reusing lobby after game is over
-  socket.on('reset-game', () => {
+  socket.on("reset-game", () => {
     if (!game.getPlayerBySessionId(player.sessionId)) return;
 
     if (player.sessionId == game.ownerId) {
@@ -35,14 +35,14 @@ export const registerPlayerSocket = (
     }
   });
 
-  socket.on('ready', () => {
+  socket.on("ready", () => {
     if (game.ownerId === player.sessionId) return;
     if (!game.getPlayerBySessionId(player.sessionId)) return;
     player.ready = !player.ready;
     game.syncPlayers();
   });
 
-  socket.on('options', (options: WordRoomOptions) => {
+  socket.on("options", (options: WordRoomOptions) => {
     if (!game.getPlayerBySessionId(player.sessionId)) return;
     if (player.sessionId != game.ownerId) return;
 
@@ -62,7 +62,7 @@ export const registerPlayerSocket = (
     storage.saveGames();
   });
 
-  socket.on('start-game', () => {
+  socket.on("start-game", () => {
     if (!game.getPlayerBySessionId(player.sessionId)) return;
     //Make sure 2 or more players are ingame
     //Also make sure you are not above round limit
@@ -75,7 +75,7 @@ export const registerPlayerSocket = (
       game.currentRound <= game.options.rounds
     ) {
       const letter = game.newRandomLetter();
-      game.toAllPlayers().emit('start-timer', 3);
+      game.toAllPlayers().emit("start-timer", 3);
 
       setTimeout(() => {
         game.currentLetter = letter;
@@ -84,7 +84,7 @@ export const registerPlayerSocket = (
         game.roundData[game.currentRound] = {
           round: game.currentRound,
           letter: game.currentLetter,
-          stopClickerId: '',
+          stopClickerId: "",
           playerValues: {},
           finalPoints: {},
           confirmedVotes: [],
@@ -98,7 +98,7 @@ export const registerPlayerSocket = (
     }
   });
 
-  socket.on('stop-game', () => {
+  socket.on("stop-game", () => {
     if (!game.getPlayerBySessionId(player.sessionId)) return;
     if (game.state != State.INGAME) return;
 
@@ -123,25 +123,25 @@ export const registerPlayerSocket = (
       const values: { [category: string]: string } = {};
       game.options.categories.forEach((cat) => {
         if (!values[cat]) {
-          values[cat] = '';
+          values[cat] = "";
         }
       });
       roundData.playerValues[p.sessionId] = values;
 
       //Values is a map of category => value
       p.getSocket()?.emit(
-        'request-values',
-        (values: { [name: string]: string }) => {
+        "request-values",
+        (values: { [catName: string]: string }) => {
           if (Date.now() <= game.stoppedAt + 5000) {
             game.options.categories.forEach((cat) => {
               if (!values[cat]) {
-                values[cat] = '';
+                values[cat] = "";
               }
               values[cat] = values[cat].trim();
             });
           } else {
             game.options.categories.forEach((cat) => {
-              values[cat] = '';
+              values[cat] = "";
             });
           }
           roundData.playerValues[p.sessionId] = values;
@@ -165,7 +165,7 @@ export const registerPlayerSocket = (
     });
   });
 
-  socket.on('vote', (voteData: Points) => {
+  socket.on("vote", (voteData: Points) => {
     const category = game.options.categories[game.currentVotingCategory];
     const roundData = game.roundData[game.currentRound];
     if (!roundData) return;
@@ -197,7 +197,7 @@ export const registerPlayerSocket = (
         //give 0 for empty values
         const playerVals = roundData.playerValues[playerToVoteFor]!;
         const playerCategoryVal = playerVals[category];
-        if (!playerCategoryVal || playerCategoryVal == '') {
+        if (!playerCategoryVal || playerCategoryVal == "") {
           val = 0;
         }
 
@@ -211,7 +211,7 @@ export const registerPlayerSocket = (
     storage.saveGames();
   });
 
-  socket.on('confirm-vote', () => {
+  socket.on("confirm-vote", () => {
     if (game.state != State.VOTING) return;
     //Someone voted
     const category = game.options.categories[game.currentVotingCategory];
@@ -223,7 +223,7 @@ export const registerPlayerSocket = (
     roundData.confirmedVotes.push(player.sessionId);
 
     //get his final client votes and start adding
-    if (roundData.clientVotes[player.nickname]) {
+    if (roundData.clientVotes[player.sessionId]) {
       const playerVotes = roundData.clientVotes[player.sessionId];
 
       game.players.forEach((p) => {
@@ -252,7 +252,7 @@ export const registerPlayerSocket = (
     }
 
     game.updateVoteCount();
-    game.chat('system', `صوت ${player.nickname}.`);
+    game.chat("system", `صوت ${player.nickname}.`);
 
     game.updatePlayerVotes();
 
