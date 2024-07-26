@@ -256,6 +256,7 @@ export const registerPlayerSocket = (
       });
     }
 
+    game.syncPlayers();
     game.updateVoteCount();
     game.chat("system", `صوت ${player.nickname}.`);
 
