@@ -134,7 +134,10 @@ export const registerPlayerSocket = (
       p.getSocket()?.emit(
         "request-values",
         (values: { [catName: string]: string }) => {
-          if (Date.now() <= game.stoppedAt + 5000) {
+          if (
+            Date.now() <= game.stoppedAt + 5000 ||
+            game.state != State.WAITING
+          ) {
             game.options.categories.forEach((cat) => {
               if (!values[cat]) {
                 values[cat] = "";
