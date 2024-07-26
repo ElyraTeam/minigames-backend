@@ -183,13 +183,13 @@ export class WordGame implements BaseGame {
     if (roundData && roundData.confirmedVotes.length === this.players.length) {
       //voting done, update final points and initiate new round
 
-      Object.keys(roundData.votes).forEach((nick) => {
-        const v = Object.values(roundData.votes[nick][category]);
+      Object.keys(roundData.votes).forEach((id) => {
+        const v = Object.values(roundData.votes[id][category]);
         let maj = 0;
         if (v.length > 0) {
           maj = findMajority(v);
         }
-        const p = this.getPlayerByNickname(nick);
+        const p = this.getPlayerBySessionId(id);
         if (p) {
           p.totalScore += maj;
           p.lastRoundScore += maj;
