@@ -42,25 +42,29 @@ export const registerPlayerSocket = (
     game.syncPlayers();
   });
 
-  socket.on("options", (options: WordRoomOptions) => {
-    if (!game.getPlayerBySessionId(player.sessionId)) return;
-    if (player.sessionId != game.ownerId) return;
+  socket.on(
+    "options",
+    (options: WordRoomOptions, ack?: (message: string) => void) => {
+      if (!game.getPlayerBySessionId(player.sessionId)) return;
+      if (player.sessionId != game.ownerId) return;
 
-    if (
-      options.maxPlayers < game.players.length ||
-      options.categories.length == 0 ||
-      options.letters.length == 0 ||
-      options.maxPlayers < 2 ||
-      options.rounds < 1
-    ) {
-      return;
+      if (
+        options.maxPlayers < game.players.length ||
+        options.categories.length == 0 ||
+        options.letters.length == 0 ||
+        options.maxPlayers < 2 ||
+        options.rounds < Object.values(game.roundData).length
+      ) {
+        ack?.("Invalid options");
+      } else {
+        game.options = options;
+      }
+
+      game.syncRoom();
+      game.syncOptions();
+      storage.saveGames();
     }
-
-    game.options = options;
-    game.syncRoom();
-    game.syncOptions();
-    storage.saveGames();
-  });
+  );
 
   socket.on("start-game", () => {
     if (!game.getPlayerBySessionId(player.sessionId)) return;
@@ -175,23 +179,9 @@ export const registerPlayerSocket = (
     const roundData = game.roundData[game.currentRound];
     if (!roundData) return;
 
-    if (!roundData.clientVotes) {
-      roundData.clientVotes = {};
-    }
-
-    game.players.forEach((p) => {
-      if (!roundData.clientVotes[p.sessionId]) {
-        roundData.clientVotes[p.sessionId] = {};
-      }
-    });
-
     //Cant vote for self lol
     if (voteData[player.sessionId]) {
       delete voteData[player.sessionId];
-    }
-
-    if (!roundData.clientVotes[player.sessionId]) {
-      roundData.clientVotes[player.sessionId] = {};
     }
 
     Object.entries(voteData).forEach(([playerToVoteFor, val]) => {
@@ -236,7 +226,7 @@ export const registerPlayerSocket = (
           playerVotes[p.sessionId] = 0;
         }
       });
-
+      //TODO force 0 for empty values
       Object.keys(playerVotes).forEach((playerToVoteFor) => {
         if (
           game.hasPlayerWithSessionId(playerToVoteFor) &&

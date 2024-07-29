@@ -126,24 +126,31 @@ export class WordGame implements BaseGame {
     });
   }
 
+  checkDuplicatedCategoryValue(value: string, category: string) {
+    const roundData = this.roundData[this.currentRound];
+    if (roundData) {
+      return Object.values(roundData.playerValues).some(
+        (p) => p[category] == value
+      );
+    }
+    return false;
+  }
+
   getCurrentCategoryVoteData() {
     const category = this.options.categories[this.currentVotingCategory];
     const roundData = this.roundData[this.currentRound]!;
 
     let plrData: PlayerValues = {};
-    Object.entries(roundData.playerValues).forEach(([key, val]) => {
+    Object.entries(roundData.playerValues).forEach(([playerId, val]) => {
       const categoryValue = val[category];
-      plrData[key] = categoryValue;
-
-      //TODO: calculate initial votes
-      roundData.finalPoints[key] = 0;
+      plrData[playerId] = categoryValue;
     });
 
     //send first category
     const categoryData = {
       category,
       values: plrData,
-      votes: roundData.finalPoints,
+      votes: this.roundData[this.currentRound]?.clientVotes ?? {},
       categoryIndex: this.currentVotingCategory,
     };
     return categoryData;
@@ -164,6 +171,37 @@ export class WordGame implements BaseGame {
       if (newCategory && !roundData.votes[p.sessionId][newCategory]) {
         roundData.votes[p.sessionId][newCategory] = {};
       }
+
+      if (!roundData.clientVotes[p.sessionId]) {
+        roundData.clientVotes[p.sessionId] = {};
+      }
+    });
+
+    Object.entries(roundData.playerValues).forEach(([playerId, val]) => {
+      const categoryValue = val[newCategory];
+
+      let initialVal: number | null = null;
+      if (!categoryValue || categoryValue == "") {
+        initialVal = 0;
+      }
+
+      console.log(playerId, categoryValue, newCategory, initialVal);
+
+      //if the value is duplicated, everyone should vote 5 for this player except himself
+      if (this.checkDuplicatedCategoryValue(categoryValue, newCategory)) {
+        initialVal = 5;
+      }
+
+      //everyone should vote 0 for this player except himself
+      this.players.forEach((p) => {
+        if (p.sessionId !== playerId && initialVal !== null) {
+          if (roundData.clientVotes[p.sessionId]) {
+            roundData.clientVotes[p.sessionId][playerId] = initialVal;
+          } else {
+            roundData.clientVotes[p.sessionId] = { [playerId]: initialVal };
+          }
+        }
+      });
     });
 
     if (this.options.categories[this.currentVotingCategory]) {
@@ -193,6 +231,7 @@ export class WordGame implements BaseGame {
         if (p) {
           p.totalScore += maj;
           p.lastRoundScore += maj;
+          roundData.finalPoints[id] = maj;
         }
       });
 
@@ -222,6 +261,7 @@ export class WordGame implements BaseGame {
 
   sendNextCategoryForVoting() {
     this.toAllPlayers().emit("start-vote", this.getCurrentCategoryVoteData());
+    this.updatePlayerVotes();
   }
 
   /**
