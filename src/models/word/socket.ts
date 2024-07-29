@@ -1,3 +1,4 @@
+import { nanoid } from "nanoid";
 import { ClientVotes, PlayerValues, State, WordRoomOptions } from "./game.js";
 
 export interface CategoryVoteData {
@@ -36,10 +37,17 @@ export interface PlayersSyncData {
   players: SyncPlayer[];
 }
 
+export interface ChatMessagePart {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  color?: string; //Hex
+}
+
 export interface ChatMessage {
   id: string;
   type: "system" | "player";
   sender: string;
-  message: string;
-  font: "normal" | "bold";
+  parts: ChatMessagePart[];
 }

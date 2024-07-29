@@ -1,9 +1,10 @@
 import { Type } from "class-transformer";
 import storage from "../../storage.js";
 import { findMajority } from "../../utils/utils.js";
-import { CategoryVoteData, ChatMessage } from "./socket.js";
+import { CategoryVoteData, ChatMessage, ChatMessagePart } from "./socket.js";
 import { nanoid } from "nanoid";
 import { BaseGame, BasePlayer, GameId } from "../base.js";
+import { ChatMessageBuilder } from "../../utils/chat.js";
 
 export interface WordRoomOptions {
   rounds: number;
@@ -207,11 +208,11 @@ export class WordGame implements BaseGame {
 
     if (this.options.categories[this.currentVotingCategory]) {
       this.chat(
-        "system",
-        `بداية التصويت لـ(${
-          this.options.categories[this.currentVotingCategory]
-        })`,
-        "bold"
+        ChatMessageBuilder.new("system", "system")
+          .addText("بداية التصويت لـ(")
+          .addText(this.options.categories[this.currentVotingCategory], true)
+          .addText(")")
+          .build()
       );
     }
   }
@@ -307,7 +308,13 @@ export class WordGame implements BaseGame {
     this.kickedPlayerSessions.push(toKick.sessionId);
     this.removePlayerLogic(toKick.sessionId);
 
-    this.chat("system", `تم طرد ${toKick.nickname}.`);
+    this.chat(
+      ChatMessageBuilder.new("system", "system")
+        .addText("تم طرد ")
+        .addText(toKick.nickname, true)
+        .addText(".")
+        .build()
+    );
 
     toKick.getSocket()?.emit("kick", "تم طردك من الغرفة.");
     toKick.getSocket()?.disconnect(true);
@@ -315,19 +322,20 @@ export class WordGame implements BaseGame {
 
   leave(toLeave: WordPlayer) {
     this.removePlayerLogic(toLeave.sessionId);
-    this.chat("system", `${toLeave.nickname} غادر.`);
+
+    this.chat(
+      ChatMessageBuilder.new("system", "system")
+        .addText("غادر ")
+        .addText(toLeave.nickname, true)
+        .addText(".")
+        .build()
+    );
 
     toLeave.getSocket()?.disconnect(true);
   }
 
-  chat(sender: string, message: string, font: "normal" | "bold" = "normal") {
-    storage.io.to(this.id).emit("chat", {
-      id: nanoid(),
-      type: sender === "system" ? "system" : "player",
-      sender,
-      message,
-      font,
-    } as ChatMessage);
+  chat(msg: ChatMessage) {
+    storage.io.to(this.id).emit("chat", msg);
   }
 
   newRandomLetter() {
@@ -444,7 +452,13 @@ export class WordGame implements BaseGame {
           this.ownerId = newOwner.sessionId;
           newOwner.ready = true;
 
-          this.chat("system", `اصبح ${newOwner.nickname} المسؤول.`);
+          this.chat(
+            ChatMessageBuilder.new("system", "system")
+              .addText("اصبح ")
+              .addText(newOwner.nickname, true)
+              .addText(" المسؤول.")
+              .build()
+          );
         }
       }
     }

@@ -11,6 +11,7 @@ import {
 } from "../models/word/game.js";
 import storage from "../storage.js";
 import { WordSocket } from "../constants/socketEvents.js";
+import { ChatMessageBuilder } from "../utils/chat.js";
 
 export const registerPlayerSocket = (
   socket: WordSocket,
@@ -20,7 +21,9 @@ export const registerPlayerSocket = (
   socket.on("chat", (msg: string) => {
     //check if player is in game
     if (!game.getPlayerBySessionId(player.sessionId)) return;
-    game.chat(player.nickname, msg);
+    game.chat(
+      ChatMessageBuilder.new(player.nickname, "player").addText(msg).build()
+    );
   });
 
   //Allow reusing lobby after game is over
@@ -264,7 +267,13 @@ export const registerPlayerSocket = (
 
     game.syncPlayers();
     game.updateVoteCount();
-    game.chat("system", `صوت ${player.nickname}.`);
+    game.chat(
+      ChatMessageBuilder.new("system", "system")
+        .addText("صوت ")
+        .addText(player.nickname, true)
+        .addText(".")
+        .build()
+    );
 
     game.updatePlayerVotes();
 
