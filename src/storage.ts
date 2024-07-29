@@ -5,6 +5,7 @@ import { Feedback } from "./models/feedback.js";
 import { MsGame } from "./models/minesweeper/game.js";
 import { minigames_db } from "./db.js";
 import { BaseGame, GameId } from "./models/base.js";
+import { ObjectId } from "mongodb";
 
 class GameStorage<T extends BaseGame> {
   private games: T[] = [];
@@ -82,6 +83,7 @@ class Storage {
 
   async saveFeedbacks() {
     for (const f of this.feedbacks) {
+      if (!f._id) f._id = new ObjectId();
       await minigames_db
         .collection("feedbacks")
         .updateOne({ _id: f._id }, { $set: f }, { upsert: true });
