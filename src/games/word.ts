@@ -10,13 +10,14 @@ import {
   WordRoomOptions,
 } from "../models/word/game.js";
 import storage from "../storage.js";
+import { WordSocket } from "../constants/socketEvents.js";
 
 export const registerPlayerSocket = (
-  socket: Socket,
+  socket: WordSocket,
   game: Game,
   player: Player
 ) => {
-  socket.on("chat", (msg) => {
+  socket.on("chat", (msg: string) => {
     //check if player is in game
     if (!game.getPlayerBySessionId(player.sessionId)) return;
     game.chat(player.nickname, msg);
@@ -135,6 +136,7 @@ export const registerPlayerSocket = (
       }
 
       //Values is a map of category => value
+
       p.getSocket()?.emit(
         "request-values",
         (values: { [catName: string]: string }) => {

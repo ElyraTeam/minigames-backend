@@ -1,7 +1,7 @@
 import { Type } from "class-transformer";
 import storage from "../../storage.js";
 import { findMajority } from "../../utils/utils.js";
-import { ChatMessage } from "./socket.js";
+import { CategoryVoteData, ChatMessage } from "./socket.js";
 import { nanoid } from "nanoid";
 import { BaseGame, BasePlayer, GameId } from "../base.js";
 
@@ -122,6 +122,7 @@ export class WordGame implements BaseGame {
     this.players.forEach((p) => {
       p.totalScore = 0;
       p.voted = false;
+      p.ready = false;
       p.lastRoundScore = 0;
     });
   }
@@ -136,7 +137,7 @@ export class WordGame implements BaseGame {
     return false;
   }
 
-  getCurrentCategoryVoteData() {
+  getCurrentCategoryVoteData(): CategoryVoteData {
     const category = this.options.categories[this.currentVotingCategory];
     const roundData = this.roundData[this.currentRound]!;
 

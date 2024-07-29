@@ -20,6 +20,10 @@ import { Feedback } from "./models/feedback.js";
 import env, { isProd } from "./env.js";
 import { sessionMiddleware } from "./middlewares/sessionMiddlewares.js";
 import { AuthenticateRequest } from "./models/base.js";
+import {
+  WordClientToServerEvents,
+  WordServerToClientEvents,
+} from "./constants/socketEvents.js";
 
 const app = express();
 const http = createServer(app);

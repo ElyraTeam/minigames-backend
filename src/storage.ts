@@ -6,6 +6,11 @@ import { MsGame } from "./models/minesweeper/game.js";
 import { minigames_db } from "./db.js";
 import { BaseGame, GameId } from "./models/base.js";
 import { ObjectId } from "mongodb";
+import {
+  WordClientToServerEvents,
+  WordServer,
+  WordServerToClientEvents,
+} from "./constants/socketEvents.js";
 
 class GameStorage<T extends BaseGame> {
   private games: T[] = [];
@@ -37,7 +42,7 @@ class GameStorage<T extends BaseGame> {
 }
 
 class Storage {
-  public io!: Server;
+  public io!: WordServer;
 
   public feedbacks: Feedback[] = [];
 
