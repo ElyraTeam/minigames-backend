@@ -147,6 +147,14 @@ export const registerPlayerSocket = (
                 values[cat] = "";
               }
               values[cat] = values[cat].trim();
+
+              if (values[cat].length > 100) {
+                values[cat] = values[cat].slice(0, 100);
+              }
+
+              if (values[cat].length < 2) {
+                values[cat] = "";
+              }
             });
           } else {
             game.options.categories.forEach((cat) => {
@@ -226,7 +234,6 @@ export const registerPlayerSocket = (
           playerVotes[p.sessionId] = 0;
         }
       });
-      //TODO force 0 for empty values
       Object.keys(playerVotes).forEach((playerToVoteFor) => {
         if (
           game.hasPlayerWithSessionId(playerToVoteFor) &&
@@ -238,6 +245,13 @@ export const registerPlayerSocket = (
 
           if (!roundData.votes[playerToVoteFor][category]) {
             roundData.votes[playerToVoteFor][category] = {};
+          }
+
+          //check player value for category and give 0 if empty
+
+          const val = roundData.playerValues[playerToVoteFor][category];
+          if (!val || val == "") {
+            playerVotes[playerToVoteFor] = 0;
           }
 
           roundData.votes[playerToVoteFor][category][player.sessionId] =
