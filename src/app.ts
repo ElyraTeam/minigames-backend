@@ -1,29 +1,25 @@
-import "reflect-metadata";
-import "dotenv/config";
-import express, { NextFunction } from "express";
-import { createServer } from "http";
-import { Server } from "socket.io";
-import * as errors from "./utils/errors.js";
-import cookieSession from "cookie-session";
-import helmet from "helmet";
-import hpp from "hpp";
-import cors from "cors";
-import morgan from "morgan";
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import cookieSession from "cookie-session";
+import cors from "cors";
+import "dotenv/config";
+import express, { NextFunction } from "express";
+import helmet from "helmet";
+import hpp from "hpp";
+import { createServer } from "http";
+import morgan from "morgan";
+import "reflect-metadata";
+import { Server } from "socket.io";
+import * as errors from "./utils/errors.js";
 
-import wordRouter from "./routes/wordRoutes.js";
-import storage from "./storage.js";
-import { registerPlayerSocket } from "./games/word.js";
-import { State, WordGame, WordPlayer } from "./models/word/game.js";
-import { Feedback } from "./models/feedback.js";
 import env, { isProd } from "./env.js";
+import { registerPlayerSocket } from "./games/word.js";
 import { sessionMiddleware } from "./middlewares/sessionMiddlewares.js";
 import { AuthenticateRequest } from "./models/base.js";
-import {
-  WordClientToServerEvents,
-  WordServerToClientEvents,
-} from "./constants/socketEvents.js";
+import { Feedback } from "./models/feedback.js";
+import { State, WordGame, WordPlayer } from "./models/word/game.js";
+import wordRouter from "./routes/wordRoutes.js";
+import storage from "./storage.js";
 
 const app = express();
 const http = createServer(app);
