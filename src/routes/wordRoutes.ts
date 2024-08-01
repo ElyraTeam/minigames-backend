@@ -51,10 +51,10 @@ router.get(
 
 router.post("/room/create", (req, res) => {
   const defaultOptions: WordRoomOptions = {
-    maxPlayers: 4,
+    maxPlayers: 8,
     categories: DEFAULT_CATEGORIES_ARABIC,
     letters: CHARS_ARABIC,
-    rounds: 5,
+    rounds: 4,
     isPrivate: true,
   };
 
