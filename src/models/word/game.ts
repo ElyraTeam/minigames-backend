@@ -123,10 +123,7 @@ export class WordGame implements BaseGame {
     this.players.forEach((p) => {
       p.totalScore = 0;
       p.voted = false;
-      p.ready = false;
-      if (this.ownerId === p.sessionId) {
-        p.ready = true;
-      }
+      p.ready = this.ownerId === p.sessionId;
       p.lastRoundScore = 0;
     });
   }
@@ -137,7 +134,9 @@ export class WordGame implements BaseGame {
       const values = Object.values(roundData.playerValues).map(
         (val) => val[category]
       );
-      const occurrences = values.filter((val) => val == value).length;
+      const occurrences = values.filter(
+        (val) => val !== "" && val != undefined && val != null && val == value
+      ).length;
       return occurrences > 1;
     }
     return false;
