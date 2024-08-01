@@ -57,7 +57,7 @@ export const registerPlayerSocket = (
         options.categories.length == 0 ||
         options.letters.length == 0 ||
         options.maxPlayers < 2 ||
-        options.rounds < Object.values(game.roundData).length
+        options.rounds < Object.values(game.roundData).length - 1
       ) {
         ack?.("Invalid options");
       } else {
