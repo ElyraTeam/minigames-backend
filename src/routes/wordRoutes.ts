@@ -103,9 +103,9 @@ router.post("/room/join/:roomId", (req, res) => {
 
   const foundPlayer = game.getPlayerByNickname(nickname);
   if (foundPlayer) {
-    if (foundPlayer.sessionId != req.session!.id) {
-      return res.status(403).json(errors.nicknameInUse);
-    }
+    // if (foundPlayer.sessionId != req.session!.id) {
+    //   return res.status(403).json(errors.nicknameInUse);
+    // }
     if (foundPlayer.sessionId == req.session!.id && foundPlayer.online) {
       return res.status(403).json(errors.alreadyInRoom);
     }
