@@ -184,6 +184,11 @@ storage.io.on("connection", (socket) => {
           gameRoom.syncRoom();
           gameRoom.syncOptions();
           gameRoom.syncPlayers();
+
+          if (gameRoom.state == State.GAME_OVER) {
+            gameRoom.emitGameOver(player);
+          }
+
           storage.saveGames();
           if (ack) {
             ack("good");
