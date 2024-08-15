@@ -88,7 +88,9 @@ router.get("/room/check/:roomId", (req, res) => {
     }
   }
 
-  return res.status(200).json({ roomId });
+  const ownerPlayer = game.getPlayerBySessionId(game.ownerId);
+
+  return res.status(200).json({ roomId, owner: ownerPlayer?.nickname });
 });
 
 router.post("/room/join/:roomId", (req, res) => {
