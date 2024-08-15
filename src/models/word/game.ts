@@ -221,6 +221,18 @@ export class WordGame implements BaseGame {
     }
   }
 
+  emitGameOver(to: WordPlayer | undefined = undefined) {
+    const top3 = this.players
+      .sort((a, b) => b.totalScore - a.totalScore)
+      .slice(0, 3);
+
+    if (to) {
+      to.getSocket()?.emit("game-over", top3);
+    } else {
+      this.toAllPlayers().emit("game-over", top3);
+    }
+  }
+
   checkEveryoneVoted() {
     const roundData = this.roundData[this.currentRound];
     const category = this.options.categories[this.currentVotingCategory];
@@ -250,6 +262,7 @@ export class WordGame implements BaseGame {
         //if last round, send game over
         if (this.currentRound == this.options.rounds) {
           this.state = State.GAME_OVER;
+          this.emitGameOver();
         } else {
           this.state = State.LOBBY;
           this.currentRound++;

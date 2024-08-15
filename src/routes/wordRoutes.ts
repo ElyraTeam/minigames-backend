@@ -162,6 +162,10 @@ router.post("/room/join/:roomId", (req, res) => {
   game.syncRoom();
   game.syncPlayers();
 
+  if (game.state == State.GAME_OVER) {
+    game.emitGameOver(player);
+  }
+
   return res.status(200).json({
     roomId,
     roomOptions: game.options,

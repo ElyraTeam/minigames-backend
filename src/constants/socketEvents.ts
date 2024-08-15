@@ -1,6 +1,11 @@
 import { Server, Socket } from "socket.io";
 import { AuthenticateRequest } from "../models/base.js";
-import { ClientVotes, Points, WordRoomOptions } from "../models/word/game.js";
+import {
+  ClientVotes,
+  Points,
+  WordPlayer,
+  WordRoomOptions,
+} from "../models/word/game.js";
 import {
   CategoryVoteData,
   ChatMessage,
@@ -55,6 +60,7 @@ export interface WordServerToClientEvents {
   "request-values": (
     ack: (values: { [catName: string]: string }) => void
   ) => void;
+  "game-over": (top3: WordPlayer[]) => void;
 }
 
 export type WordSocket = Socket<
