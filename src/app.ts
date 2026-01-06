@@ -30,11 +30,8 @@ Sentry.init({
 });
 
 const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    callback(null, origin);
-  },
-  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
+  origin: true,
 };
 
 storage.io = new Server(http, {
