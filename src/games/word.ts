@@ -7,36 +7,77 @@ import {
   Points,
   RoundData,
   State,
+  WordRoomOptions,
 } from "../models/word/game.js";
 import storage from "../storage.js";
+import { WordSocket } from "../constants/socketEvents.js";
+import { ChatMessageBuilder } from "../utils/chat.js";
 
 export const registerPlayerSocket = (
-  socket: Socket,
+  socket: WordSocket,
   game: Game,
   player: Player
 ) => {
-  socket.on("chat", (msg) => {
+  socket.on("chat", (msg: string) => {
     //check if player is in game
-    if (!game.players.find((p) => p.authToken == player.authToken)) return;
-    game.chat(player.nickname, msg);
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
+    game.chat(
+      ChatMessageBuilder.new(player.nickname, "player").addText(msg).build()
+    );
   });
 
   //Allow reusing lobby after game is over
   socket.on("reset-game", () => {
-    if (player.owner) {
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
+
+    if (player.sessionId == game.ownerId) {
       game.reset();
 
-      game.sync();
+      game.syncRoom();
       game.syncPlayers();
       storage.saveGames();
     }
   });
 
+  socket.on("ready", () => {
+    if (game.ownerId === player.sessionId) return;
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
+    player.ready = !player.ready;
+    game.syncPlayers();
+  });
+
+  socket.on(
+    "options",
+    (options: WordRoomOptions, ack?: (message: string) => void) => {
+      if (!game.getPlayerBySessionId(player.sessionId)) return;
+      if (player.sessionId != game.ownerId) return;
+
+      if (
+        options.maxPlayers < game.players.length ||
+        options.categories.length == 0 ||
+        options.letters.length == 0 ||
+        options.maxPlayers < 2 ||
+        options.rounds < Object.values(game.roundData).length - 1
+      ) {
+        ack?.("Invalid options");
+      } else {
+        game.options = options;
+      }
+
+      game.syncRoom();
+      game.syncOptions();
+      storage.saveGames();
+    }
+  );
+
   socket.on("start-game", () => {
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
     //Make sure 2 or more players are ingame
     //Also make sure you are not above round limit
+    const allReady = game.players.every((p) => p.ready);
     if (
-      player.owner &&
+      allReady &&
+      player.sessionId == game.ownerId &&
       game.state == State.LOBBY &&
       game.players.length >= 2 &&
       game.currentRound <= game.options.rounds
@@ -51,7 +92,7 @@ export const registerPlayerSocket = (
         game.roundData[game.currentRound] = {
           round: game.currentRound,
           letter: game.currentLetter,
-          stopClicker: "",
+          stopClickerId: "",
           playerValues: {},
           finalPoints: {},
           confirmedVotes: [],
@@ -59,55 +100,73 @@ export const registerPlayerSocket = (
           clientVotes: {},
         };
 
-        game.sync();
+        game.syncRoom();
         storage.saveGames();
       }, 2200);
     }
   });
 
   socket.on("stop-game", () => {
+    if (!game.getPlayerBySessionId(player.sessionId)) return;
     if (game.state != State.INGAME) return;
 
     const roundData = game.roundData[game.currentRound];
     if (!roundData) return;
 
-    roundData.stopClicker = player.nickname;
+    roundData.stopClickerId = player.sessionId;
 
     game.doneLetters.push(game.currentLetter);
     game.stoppedAt = Date.now();
     game.state = State.WAITING;
-    game.sync();
+    game.syncRoom();
     storage.saveGames();
 
     game.players.forEach((p) => {
       p.voted = false;
+      if (p.sessionId !== game.ownerId) {
+        p.ready = false;
+      }
       p.lastRoundScore = 0;
 
-      const values: { [name: string]: string } = {};
-      game.options.categories.forEach((cat) => {
-        if (!values[cat]) {
-          values[cat] = "";
-        }
-      });
-      roundData.playerValues[p.nickname] = values;
+      if (p.online === false) {
+        const values: { [category: string]: string } = {};
+        game.options.categories.forEach((cat) => {
+          if (!values[cat]) {
+            values[cat] = "";
+          }
+        });
+        roundData.playerValues[p.sessionId] = values;
+      }
 
       //Values is a map of category => value
+
       p.getSocket()?.emit(
         "request-values",
-        (values: { [name: string]: string }) => {
-          if (Date.now() <= game.stoppedAt + 5000) {
+        (values: { [catName: string]: string }) => {
+          if (
+            Date.now() <= game.stoppedAt + 5000 ||
+            game.state != State.WAITING
+          ) {
             game.options.categories.forEach((cat) => {
               if (!values[cat]) {
                 values[cat] = "";
               }
               values[cat] = values[cat].trim();
+
+              if (values[cat].length > 100) {
+                values[cat] = values[cat].slice(0, 100);
+              }
+
+              if (values[cat].length < 2) {
+                values[cat] = "";
+              }
             });
           } else {
             game.options.categories.forEach((cat) => {
               values[cat] = "";
             });
           }
-          roundData.playerValues[p.nickname] = values;
+          roundData.playerValues[p.sessionId] = values;
           //Check if every player sent their data
           if (
             Object.entries(roundData.playerValues).length >=
@@ -118,7 +177,7 @@ export const registerPlayerSocket = (
             game.currentVotingCategory = 0;
             game.prepareNewCategoryVoting();
             game.state = State.VOTING;
-            game.sync();
+            game.syncRoom();
             storage.saveGames();
 
             game.sendNextCategoryForVoting();
@@ -133,29 +192,15 @@ export const registerPlayerSocket = (
     const roundData = game.roundData[game.currentRound];
     if (!roundData) return;
 
-    if (!roundData.clientVotes) {
-      roundData.clientVotes = {};
-    }
-
-    game.players.forEach((p) => {
-      if (!roundData.clientVotes[p.nickname]) {
-        roundData.clientVotes[p.nickname] = {};
-      }
-    });
-
     //Cant vote for self lol
-    if (voteData[player.nickname]) {
-      delete voteData[player.nickname];
-    }
-
-    if (!roundData.clientVotes[player.nickname]) {
-      roundData.clientVotes[player.nickname] = {};
+    if (voteData[player.sessionId]) {
+      delete voteData[player.sessionId];
     }
 
     Object.entries(voteData).forEach(([playerToVoteFor, val]) => {
       if (
-        game.hasPlayerWithName(playerToVoteFor) &&
-        playerToVoteFor !== player.nickname
+        game.hasPlayerWithSessionId(playerToVoteFor) &&
+        playerToVoteFor !== player.sessionId
       ) {
         //give 0 for empty values
         const playerVals = roundData.playerValues[playerToVoteFor]!;
@@ -165,7 +210,7 @@ export const registerPlayerSocket = (
         }
 
         if (val == 0 || val == 5 || val == 10) {
-          roundData.clientVotes[player.nickname][playerToVoteFor] = val;
+          roundData.clientVotes[player.sessionId][playerToVoteFor] = val;
         }
       }
     });
@@ -180,25 +225,24 @@ export const registerPlayerSocket = (
     const category = game.options.categories[game.currentVotingCategory];
     const roundData = game.roundData[game.currentRound];
     if (!roundData) return;
-    if (roundData.confirmedVotes.includes(player.nickname)) return; //disallow revoting
+    if (roundData.confirmedVotes.includes(player.sessionId)) return; //disallow revoting
 
     player.voted = true;
-    roundData.confirmedVotes.push(player.nickname);
+    roundData.confirmedVotes.push(player.sessionId);
 
     //get his final client votes and start adding
-    if (roundData.clientVotes[player.nickname]) {
-      const playerVotes = roundData.clientVotes[player.nickname];
+    if (roundData.clientVotes[player.sessionId]) {
+      const playerVotes = roundData.clientVotes[player.sessionId];
 
       game.players.forEach((p) => {
-        if (!playerVotes[p.nickname] && p.nickname !== player.nickname) {
-          playerVotes[p.nickname] = 0;
+        if (!playerVotes[p.sessionId] && p.sessionId !== player.sessionId) {
+          playerVotes[p.sessionId] = 0;
         }
       });
-
       Object.keys(playerVotes).forEach((playerToVoteFor) => {
         if (
-          game.hasPlayerWithName(playerToVoteFor) &&
-          playerToVoteFor !== player.nickname
+          game.hasPlayerWithSessionId(playerToVoteFor) &&
+          playerToVoteFor !== player.sessionId
         ) {
           if (!roundData.votes[playerToVoteFor]) {
             roundData.votes[playerToVoteFor] = {};
@@ -208,14 +252,28 @@ export const registerPlayerSocket = (
             roundData.votes[playerToVoteFor][category] = {};
           }
 
-          roundData.votes[playerToVoteFor][category][player.nickname] =
+          //check player value for category and give 0 if empty
+
+          const val = roundData.playerValues[playerToVoteFor][category];
+          if (!val || val == "") {
+            playerVotes[playerToVoteFor] = 0;
+          }
+
+          roundData.votes[playerToVoteFor][category][player.sessionId] =
             playerVotes[playerToVoteFor];
         }
       });
     }
 
+    game.syncPlayers();
     game.updateVoteCount();
-    game.chat("system", `صوت ${player.nickname}.`);
+    game.chat(
+      ChatMessageBuilder.new("system", "system")
+        .addText("صوت ")
+        .addText(player.nickname, true)
+        .addText(".")
+        .build()
+    );
 
     game.updatePlayerVotes();
 

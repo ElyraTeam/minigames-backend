@@ -4,57 +4,95 @@ import { plainToInstance } from "class-transformer";
 import { Feedback } from "./models/feedback.js";
 import { MsGame } from "./models/minesweeper/game.js";
 import { minigames_db } from "./db.js";
+import { BaseGame, GameId } from "./models/base.js";
+import { ObjectId } from "mongodb";
+import {
+  WordClientToServerEvents,
+  WordServer,
+  WordServerToClientEvents,
+} from "./constants/socketEvents.js";
 
-interface Games {
-  word: WordGame[];
-  minesweeper: MsGame[];
+class GameStorage<T extends BaseGame> {
+  private games: T[] = [];
+
+  //save function
+  protected doSave?: () => void;
+
+  setSaveFunction(save: () => void) {
+    this.doSave = save;
+  }
+
+  getGames() {
+    return this.games;
+  }
+
+  getGame(id: string) {
+    return this.games.find((g) => g.id == id);
+  }
+
+  addGame(game: T) {
+    this.games.push(game);
+    this.doSave && this.doSave();
+  }
+
+  removeGame(id: string) {
+    this.games = this.games.filter((g) => g.id !== id);
+    this.doSave && this.doSave();
+  }
 }
 
 class Storage {
-  public games: Games = {
-    word: [],
-    minesweeper: [],
-  };
-  public feedbacks: Feedback[] = [];
-  public io!: Server;
+  public io!: WordServer;
 
-  removeGame(id: string) {
-    this.games.word = this.games.word.filter((g) => g.id !== id);
-    this.saveGames();
+  public feedbacks: Feedback[] = [];
+
+  public wordStorage = new GameStorage<WordGame>();
+  public minesweeperStorage = new GameStorage<MsGame>();
+
+  constructor() {
+    this.wordStorage.setSaveFunction(() => this.saveGames());
+    this.minesweeperStorage.setSaveFunction(() => this.saveGames());
+  }
+
+  getStorageForGame(gameId: GameId) {
+    switch (gameId) {
+      case "word":
+        return this.wordStorage;
+      case "minesweeper":
+        return this.minesweeperStorage;
+      default:
+        throw new Error("Invalid game id");
+    }
   }
 
   async saveGames() {
-    for (const game of this.games.word) {
+    //TODO make this universal
+    for (const game of this.wordStorage.getGames()) {
+      const toSave: any = { ...game };
+      delete toSave._id;
       await minigames_db
         .collection("words_games")
-        .updateOne({ id: game.id }, { $set: game }, { upsert: true });
+        .updateOne({ id: game.id }, { $set: toSave }, { upsert: true });
     }
   }
 
   async loadGames() {
-    const games = await minigames_db.collection("words_games").find();
+    const wordGames = await minigames_db.collection("words_games").find();
 
-    if (games) {
-      for await (const game of games) {
-        this.games.word.push(plainToInstance(WordGame, game));
+    if (wordGames) {
+      for await (const game of wordGames) {
+        this.wordStorage.getGames().push(plainToInstance(WordGame, game));
       }
-
-      this.games.minesweeper = [];
-      // this.games.minesweeper = plainToInstance(MsGame, tempGames.minesweeper);
     }
   }
 
-  getGame(id: string) {
-    return this.games.word.find((g) => g.id == id);
-  }
-
-  createGame(game: WordGame) {
-    this.games.word.push(game);
-    this.saveGames();
-  }
-
-  saveFeedbacks() {
-    minigames_db.collection("feedbacks").insertMany(this.feedbacks);
+  async saveFeedbacks() {
+    for (const f of this.feedbacks) {
+      if (!f._id) f._id = new ObjectId();
+      await minigames_db
+        .collection("feedbacks")
+        .updateOne({ _id: f._id }, { $set: f }, { upsert: true });
+    }
   }
 
   async loadFeedbacks() {

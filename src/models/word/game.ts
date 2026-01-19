@@ -1,14 +1,17 @@
 import { Type } from "class-transformer";
 import storage from "../../storage.js";
 import { findMajority } from "../../utils/utils.js";
-import { ChatMessage } from "./socket.js";
+import { CategoryVoteData, ChatMessage, ChatMessagePart } from "./socket.js";
 import { nanoid } from "nanoid";
+import { BaseGame, BasePlayer, GameId } from "../base.js";
+import { ChatMessageBuilder } from "../../utils/chat.js";
 
 export interface WordRoomOptions {
   rounds: number;
   letters: string[];
   categories: string[];
   maxPlayers: number;
+  isPrivate: boolean;
 }
 
 export enum State {
@@ -19,27 +22,67 @@ export enum State {
   GAME_OVER,
 }
 
-export type PlayerValues = { [name: string]: string };
-export type Points = { [name: string]: number };
-export type Votes = { [name: string]: { [k: string]: number } };
+export type PlayerValues = { [playerId: string]: string };
+export type Points = { [playerId: string]: number };
+export type Votes = { [playerId: string]: { [k: string]: number } };
 export type ClientVotes = { [key: string]: { [k: string]: number } };
+
+export const DEFAULT_CATEGORIES_ARABIC = [
+  "ولد",
+  "بنت",
+  "حيوان",
+  "جماد",
+  "اكلة",
+  "نبات",
+  "بلد",
+];
+export const CHARS_ARABIC: string[] = [
+  "أ",
+  "ب",
+  "ت",
+  "ث",
+  "ج",
+  "ح",
+  "خ",
+  "د",
+  "ذ",
+  "ر",
+  "ز",
+  "س",
+  "ش",
+  "ص",
+  "ض",
+  "ط",
+  "ظ",
+  "ع",
+  "غ",
+  "ف",
+  "ق",
+  "ك",
+  "ل",
+  "م",
+  "ن",
+  "هـ",
+  "و",
+  "ى",
+];
 
 export interface RoundData {
   round: number;
-  stopClicker: string;
+  stopClickerId: string;
   letter: string;
-  playerValues: { [name: string]: PlayerValues };
+  playerValues: { [playerId: string]: PlayerValues };
   finalPoints: Points;
   confirmedVotes: string[];
 
   /**
    * Final Votes
    */
-  votes: { [name: string]: Votes };
+  votes: { [playerId: string]: Votes };
   clientVotes: ClientVotes;
 }
 
-export class WordGame {
+export class WordGame implements BaseGame {
   @Type(() => WordPlayer)
   public players: WordPlayer[] = [];
   public currentRound = 1;
@@ -49,13 +92,14 @@ export class WordGame {
   public doneLetters: string[] = [];
   public kickedPlayerSessions: string[] = [];
   public stoppedAt: number = 0;
-  public createdAt: String = "";
+  public createdAt: Date = new Date();
+  public gameId: GameId = "word";
 
   public roundData: { [key: number]: RoundData | undefined } = {};
 
   constructor(
     public id: string,
-    public owner: string,
+    public ownerId: string,
     public options: WordRoomOptions
   ) {}
 
@@ -79,28 +123,40 @@ export class WordGame {
     this.players.forEach((p) => {
       p.totalScore = 0;
       p.voted = false;
+      p.ready = this.ownerId === p.sessionId;
       p.lastRoundScore = 0;
     });
   }
 
-  getCurrentCategoryVoteData() {
+  checkDuplicatedCategoryValue(value: string, category: string) {
+    const roundData = this.roundData[this.currentRound];
+    if (roundData) {
+      const values = Object.values(roundData.playerValues).map(
+        (val) => val[category]
+      );
+      const occurrences = values.filter(
+        (val) => val !== "" && val != undefined && val != null && val == value
+      ).length;
+      return occurrences > 1;
+    }
+    return false;
+  }
+
+  getCurrentCategoryVoteData(): CategoryVoteData {
     const category = this.options.categories[this.currentVotingCategory];
     const roundData = this.roundData[this.currentRound]!;
 
     let plrData: PlayerValues = {};
-    Object.entries(roundData.playerValues).forEach(([key, val]) => {
+    Object.entries(roundData.playerValues).forEach(([playerId, val]) => {
       const categoryValue = val[category];
-      plrData[key] = categoryValue;
-
-      //TODO: calculate initial votes
-      roundData.finalPoints[key] = 0;
+      plrData[playerId] = categoryValue;
     });
 
     //send first category
     const categoryData = {
       category,
       values: plrData,
-      votes: roundData.finalPoints,
+      votes: this.roundData[this.currentRound]?.clientVotes ?? {},
       categoryIndex: this.currentVotingCategory,
     };
     return categoryData;
@@ -114,23 +170,66 @@ export class WordGame {
     roundData.clientVotes = {};
     this.players.forEach((p) => {
       p.voted = false;
-      if (!roundData.votes[p.nickname]) {
-        roundData.votes[p.nickname] = {};
+      if (!roundData.votes[p.sessionId]) {
+        roundData.votes[p.sessionId] = {};
       }
 
-      if (newCategory && !roundData.votes[p.nickname][newCategory]) {
-        roundData.votes[p.nickname][newCategory] = {};
+      if (newCategory && !roundData.votes[p.sessionId][newCategory]) {
+        roundData.votes[p.sessionId][newCategory] = {};
       }
+
+      if (!roundData.clientVotes[p.sessionId]) {
+        roundData.clientVotes[p.sessionId] = {};
+      }
+    });
+
+    Object.entries(roundData.playerValues).forEach(([playerId, val]) => {
+      const categoryValue = val[newCategory];
+
+      let initialVal: number | null = null;
+      if (!categoryValue || categoryValue == "") {
+        initialVal = 0;
+      }
+
+      console.log(playerId, categoryValue, newCategory, initialVal);
+
+      //if the value is duplicated, everyone should vote 5 for this player except himself
+      if (this.checkDuplicatedCategoryValue(categoryValue, newCategory)) {
+        initialVal = 5;
+      }
+
+      //everyone should vote 0 for this player except himself
+      this.players.forEach((p) => {
+        if (p.sessionId !== playerId && initialVal !== null) {
+          if (roundData.clientVotes[p.sessionId]) {
+            roundData.clientVotes[p.sessionId][playerId] = initialVal;
+          } else {
+            roundData.clientVotes[p.sessionId] = { [playerId]: initialVal };
+          }
+        }
+      });
     });
 
     if (this.options.categories[this.currentVotingCategory]) {
       this.chat(
-        "system",
-        `بداية التصويت لـ(${
-          this.options.categories[this.currentVotingCategory]
-        })`,
-        "bold"
+        ChatMessageBuilder.new("system", "system")
+          .addText("بداية التصويت لـ(")
+          .addText(this.options.categories[this.currentVotingCategory], true)
+          .addText(")")
+          .build()
       );
+    }
+  }
+
+  emitGameOver(to: WordPlayer | undefined = undefined) {
+    const top3 = this.players
+      .sort((a, b) => b.totalScore - a.totalScore)
+      .slice(0, 3);
+
+    if (to) {
+      to.getSocket()?.emit("game-over", top3);
+    } else {
+      this.toAllPlayers().emit("game-over", top3);
     }
   }
 
@@ -140,16 +239,17 @@ export class WordGame {
     if (roundData && roundData.confirmedVotes.length === this.players.length) {
       //voting done, update final points and initiate new round
 
-      Object.keys(roundData.votes).forEach((nick) => {
-        const v = Object.values(roundData.votes[nick][category]);
+      Object.keys(roundData.votes).forEach((id) => {
+        const v = Object.values(roundData.votes[id][category]);
         let maj = 0;
         if (v.length > 0) {
           maj = findMajority(v);
         }
-        const p = this.getPlayerWithName(nick);
+        const p = this.getPlayerBySessionId(id);
         if (p) {
           p.totalScore += maj;
           p.lastRoundScore += maj;
+          roundData.finalPoints[id] = maj;
         }
       });
 
@@ -162,13 +262,14 @@ export class WordGame {
         //if last round, send game over
         if (this.currentRound == this.options.rounds) {
           this.state = State.GAME_OVER;
+          this.emitGameOver();
         } else {
           this.state = State.LOBBY;
           this.currentRound++;
         }
 
         this.currentLetter = "";
-        this.sync();
+        this.syncRoom();
       } else {
         this.sendNextCategoryForVoting();
       }
@@ -179,16 +280,21 @@ export class WordGame {
 
   sendNextCategoryForVoting() {
     this.toAllPlayers().emit("start-vote", this.getCurrentCategoryVoteData());
+    this.updatePlayerVotes();
   }
 
-  sync() {
+  /**
+   * Syncs the room state to all players
+   * State includes: current round, current letter, current state, stop clicker
+   */
+  syncRoom() {
     storage.io.to(this.id).emit("sync", {
       id: this.id,
-      owner: this.owner,
       state: this.state,
+      ownerId: this.ownerId,
       currentRound: this.currentRound,
       currentLetter: this.currentLetter,
-      stopClicker: this.roundData[this.currentRound]?.stopClicker,
+      stopClicker: this.roundData[this.currentRound]?.stopClickerId,
     });
   }
 
@@ -203,31 +309,50 @@ export class WordGame {
     storage.io.to(this.id).emit("players", {
       id: this.id,
       players: this.players.map((p) => ({
+        id: p.sessionId,
         nickname: p.nickname,
         online: p.online,
-        owner: p.owner,
+        owner: p.sessionId == this.ownerId,
         totalScore: p.totalScore,
         lastRoundScore: p.lastRoundScore,
         voted: p.voted,
+        ready: p.ready,
       })),
     });
   }
 
   kick(toKick: WordPlayer) {
-    if (toKick.socketId) {
-      toKick.getSocket()?.emit("kick", "تم طردك من الغرفة.");
-      toKick.getSocket()?.disconnect();
-    }
+    this.kickedPlayerSessions.push(toKick.sessionId);
+    this.removePlayerLogic(toKick.sessionId);
+
+    this.chat(
+      ChatMessageBuilder.new("system", "system")
+        .addText("تم طرد ")
+        .addText(toKick.nickname, true)
+        .addText(".")
+        .build()
+    );
+
+    toKick.getSocket()?.emit("kick", "تم طردك من الغرفة.");
+    toKick.getSocket()?.disconnect(true);
   }
 
-  chat(sender: string, message: string, font: "normal" | "bold" = "normal") {
-    storage.io.to(this.id).emit("chat", {
-      id: nanoid(),
-      type: sender === "system" ? "system" : "player",
-      sender,
-      message,
-      font,
-    } as ChatMessage);
+  leave(toLeave: WordPlayer) {
+    this.removePlayerLogic(toLeave.sessionId);
+
+    this.chat(
+      ChatMessageBuilder.new("system", "system")
+        .addText("غادر ")
+        .addText(toLeave.nickname, true)
+        .addText(".")
+        .build()
+    );
+
+    toLeave.getSocket()?.disconnect(true);
+  }
+
+  chat(msg: ChatMessage) {
+    storage.io.to(this.id).emit("chat", msg);
   }
 
   newRandomLetter() {
@@ -274,36 +399,44 @@ export class WordGame {
     return this.players.some((p) => p.nickname === nickname);
   }
 
-  getPlayerWithName(nickname: string) {
+  hasPlayerWithSessionId(sessionId: string) {
+    return this.players.some((p) => p.sessionId === sessionId);
+  }
+
+  getPlayerByNickname(nickname: string) {
     return this.players.find((p) => p.nickname === nickname);
   }
 
-  removePlayer(nickname: string) {
+  getPlayerBySessionId(sessionId: string) {
+    return this.players.find((p) => p.sessionId === sessionId);
+  }
+
+  private removePlayer(sessionId: string) {
     const roundData = this.roundData[this.currentRound];
     if (roundData) {
-      if (roundData.clientVotes[nickname]) {
-        delete roundData.clientVotes[nickname];
+      if (roundData.clientVotes[sessionId]) {
+        delete roundData.clientVotes[sessionId];
       }
 
-      if (roundData.confirmedVotes.includes(nickname)) {
+      if (roundData.confirmedVotes.includes(sessionId)) {
         roundData.confirmedVotes = roundData.confirmedVotes.filter(
-          (n) => n !== nickname
+          (n) => n !== sessionId
         );
       }
 
-      if (roundData.votes[nickname]) {
-        delete roundData.votes[nickname];
+      if (roundData.votes[sessionId]) {
+        delete roundData.votes[sessionId];
       }
 
-      if (roundData.playerValues[nickname]) {
-        delete roundData.playerValues[nickname];
+      if (roundData.playerValues[sessionId]) {
+        delete roundData.playerValues[sessionId];
       }
 
       this.players.forEach((p) => {
-        if (p.nickname !== nickname && roundData.votes[p.nickname]) {
-          Object.keys(roundData.votes[p.nickname]).forEach((voteCat) => {
-            if (roundData.votes[p.nickname][voteCat][nickname]) {
-              delete roundData.votes[p.nickname][voteCat][nickname];
+        if (p.sessionId !== sessionId && roundData.votes[p.sessionId]) {
+          Object.keys(roundData.votes[p.sessionId]).forEach((voteCat) => {
+            if (roundData.votes[p.sessionId][voteCat][sessionId]) {
+              delete roundData.votes[p.sessionId][voteCat][sessionId];
             }
           });
         }
@@ -316,51 +449,63 @@ export class WordGame {
       this.sendNextCategoryForVoting();
     }
 
-    this.players = this.players.filter((p) => p.nickname !== nickname);
+    this.players = this.players.filter((p) => p.sessionId !== sessionId);
     if (this.state == State.VOTING) {
       this.checkEveryoneVoted();
     }
   }
 
-  removePlayerLogic(nickname: string) {
-    const foundPlayer = this.getPlayerWithName(nickname);
+  removePlayerLogic(sessionId: string) {
+    const foundPlayer = this.getPlayerBySessionId(sessionId);
     if (foundPlayer) {
-      this.removePlayer(nickname);
+      this.removePlayer(sessionId);
       if (this.players.length == 0) {
         //last player, delete game;
-        storage.removeGame(this.id);
+        storage.wordStorage.removeGame(this.id);
       } else if (this.players.length > 0) {
         //find another owner, for now get next player
-        if (foundPlayer.owner) {
+        if (foundPlayer.sessionId == this.ownerId) {
           const newOwner = this.players[0];
-          newOwner.owner = true;
-          this.owner = newOwner.nickname;
+          this.ownerId = newOwner.sessionId;
+          newOwner.ready = true;
 
-          this.chat("system", `اصبح ${this.owner} المسؤول.`);
+          this.chat(
+            ChatMessageBuilder.new("system", "system")
+              .addText("اصبح ")
+              .addText(newOwner.nickname, true)
+              .addText(" المسؤول.")
+              .build()
+          );
         }
       }
     }
   }
 }
-export class WordPlayer {
-  public authToken?: string;
-  public online: boolean = false;
+export class WordPlayer extends BasePlayer {
   public totalScore = 0;
   public lastRoundScore = 0;
-  public socketId?: string;
   public voted: boolean = false;
-  public offlineAt = 0;
 
   constructor(
     public nickname: string,
-    public owner: boolean,
-    public sessionId: string
-  ) {}
+    public sessionId: string,
+    protected authToken: string
+  ) {
+    super(authToken, nickname, sessionId);
+  }
 
   getSocket() {
     if (!this.socketId) {
       return undefined;
     }
     return storage.io.sockets.sockets.get(this.socketId);
+  }
+
+  setAuthToken(authToken: string) {
+    this.authToken = authToken;
+  }
+
+  checkAuth(authToken: string) {
+    return this.authToken === authToken;
   }
 }

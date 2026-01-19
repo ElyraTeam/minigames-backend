@@ -1,23 +1,25 @@
-import "reflect-metadata";
-import "dotenv/config";
-import express, { NextFunction } from "express";
-import { createServer } from "http";
-import { Server } from "socket.io";
-import * as errors from "./utils/errors.js";
-import cookieSession from "cookie-session";
-import helmet from "helmet";
-import hpp from "hpp";
-import cors from "cors";
-import morgan from "morgan";
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import cookieSession from "cookie-session";
+import cors from "cors";
+import "dotenv/config";
+import express, { NextFunction } from "express";
+import helmet from "helmet";
+import hpp from "hpp";
+import { createServer } from "http";
+import morgan from "morgan";
+import "reflect-metadata";
+import { Server } from "socket.io";
+import * as errors from "./utils/errors.js";
 
+import env, { isProd } from "./env.js";
+import { registerPlayerSocket } from "./games/word.js";
+import { sessionMiddleware } from "./middlewares/sessionMiddlewares.js";
+import { AuthenticateRequest } from "./models/base.js";
+import { Feedback } from "./models/feedback.js";
+import { State, WordGame, WordPlayer } from "./models/word/game.js";
 import wordRouter from "./routes/wordRoutes.js";
 import storage from "./storage.js";
-import { AuthenticateRequest } from "./models/word/socket.js";
-import { registerPlayerSocket } from "./games/word.js";
-import { State } from "./models/word/game.js";
-import { Feedback } from "./models/feedback.js";
 
 const app = express();
 const http = createServer(app);
@@ -38,9 +40,9 @@ storage.io = new Server(http, {
   cors: corsOptions,
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = env.PORT || 5000;
 
-app.set("trust proxy", "loopback");
+app.set("trust proxy", true);
 app.use(
   helmet({
     crossOriginEmbedderPolicy: false,
@@ -52,29 +54,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(hpp());
 app.use(cors(corsOptions));
-app.use(
-  cookieSession({
-    name: "session",
-    secret: process.env.COOKIE_SECRET,
-    sameSite: "none",
-    secureProxy: true,
-    maxAge: 604800000,
-    httpOnly: true,
-  })
-);
+
+const cookieMiddleware = cookieSession({
+  name: "session",
+  secret: env.COOKIE_SECRET,
+  secure: isProd,
+  maxAge: 604800000,
+  httpOnly: true,
+  sameSite: isProd ? "none" : "lax",
+});
+storage.io.engine.use(cookieMiddleware);
+app.use(cookieMiddleware);
 app.use(morgan("combined"));
 
-//Assign random id to each session
-// app.use((req: express.Request, res: express.Response, next) => {
-//   if (!req.session) {
-//     req.session = {};
-//   }
-
-//   if (!req.session.id) {
-//     req.session.id = nanoid();
-//   }
-//   next();
-// });
+app.use(sessionMiddleware);
 
 app.get("/", (req, res) => {
   res.status(200).send("All good!");
@@ -116,36 +109,51 @@ storage.io.on("connection", (socket) => {
   socket.on(
     "authenticate",
     (data: AuthenticateRequest, ack?: (res: string) => void) => {
-      const game = storage.getGame(data.roomId);
-      if (game) {
-        const player = game.getPlayerWithName(data.nickname);
+      const gameId = data.game;
+      const gameRoom = storage.getStorageForGame(gameId).getGame(data.roomId);
 
-        if (player && player.authToken === data.authToken) {
+      if (gameRoom) {
+        console.log(
+          "Authenticating game",
+          gameRoom.id,
+          (socket.request as any).session
+        );
+        const player = gameRoom.getPlayerBySessionId(
+          (socket.request as any).session.id
+        );
+        console.log("Authenticating player", player?.nickname);
+        //Word Specific
+        if (
+          player &&
+          player.checkAuth(data.authToken) &&
+          gameRoom instanceof WordGame &&
+          player instanceof WordPlayer
+        ) {
           socket.on("disconnect", () => {
             player.socketId = undefined;
             player.online = false;
             player.offlineAt = Date.now();
-            game.syncPlayers();
+            gameRoom.syncPlayers();
             storage.saveGames();
 
-            setTimeout(() => {
-              if (
-                game.hasPlayerWithName(player.nickname) &&
-                player.offlineAt != 0 &&
-                Date.now() >= player.offlineAt + 1 * 60 * 1000 &&
-                player.online == false &&
-                player.socketId == undefined
-              ) {
-                game.removePlayerLogic(player.nickname);
-                game.chat(
-                  "system",
-                  "تم طرد " + player.nickname + " لعدم النشاط."
-                );
-                game.sync();
-                game.syncPlayers();
-                storage.saveGames();
-              }
-            }, 1 * 60 * 1000);
+            //   setTimeout(() => {
+            //     if (
+            //       game.hasPlayerWithName(player.nickname) &&
+            //       player.offlineAt != 0 &&
+            //       Date.now() >= player.offlineAt + 1 * 60 * 1000 &&
+            //       player.online == false &&
+            //       player.socketId == undefined
+            //     ) {
+            //       game.removePlayerLogic(player.nickname);
+            //       game.chat(
+            //         "system",
+            //         "تم طرد " + player.nickname + " لعدم النشاط."
+            //       );
+            //       game.sync();
+            //       game.syncPlayers();
+            //       storage.saveGames();
+            //     }
+            //   }, 1 * 60 * 1000);
           });
 
           socket.on("ping", (cb) => {
@@ -160,19 +168,24 @@ storage.io.on("connection", (socket) => {
           socket.data.nickname = player.nickname;
           socket.data.sessionId = player.sessionId;
 
-          registerPlayerSocket(socket, game, player);
+          registerPlayerSocket(socket, gameRoom, player);
 
-          socket.join(game.id);
+          socket.join(gameRoom.id);
 
-          if (game.state == State.VOTING) {
-            socket.emit("start-vote", game.getCurrentCategoryVoteData());
-            game.updatePlayerVotes();
-            game.updateVoteCount();
+          if (gameRoom.state == State.VOTING) {
+            socket.emit("start-vote", gameRoom.getCurrentCategoryVoteData());
+            gameRoom.updatePlayerVotes();
+            gameRoom.updateVoteCount();
           }
 
-          game.sync();
-          game.syncOptions();
-          game.syncPlayers();
+          gameRoom.syncRoom();
+          gameRoom.syncOptions();
+          gameRoom.syncPlayers();
+
+          if (gameRoom.state == State.GAME_OVER) {
+            gameRoom.emitGameOver(player);
+          }
+
           storage.saveGames();
           if (ack) {
             ack("good");
@@ -183,19 +196,17 @@ storage.io.on("connection", (socket) => {
   );
 });
 
-function loadData() {
-  console.log("Loading games...");
-  storage
-    .loadGames()
-    .then(() => storage.loadFeedbacks())
-    .then(() => startServer());
-}
+const main = async () => {
+  console.log("Loading data...");
+  await Promise.all([storage.loadGames(), storage.loadFeedbacks()]);
+  startServer();
+};
 
-function startServer() {
+const startServer = () => {
   console.log("Starting server..");
   http.listen(PORT, () => {
     console.log("listening on *:" + PORT);
   });
-}
+};
 
-loadData();
+main();
