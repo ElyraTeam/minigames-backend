@@ -55,6 +55,7 @@ const setupExpressApp = async () => {
   app.use(express.urlencoded({ extended: false }));
   app.use(hpp());
   app.use(morgan("combined"));
+  app.use(cors(corsOptions));
 
   // const cookieMiddleware = cookieSession({
   //   name: "session",
