@@ -33,6 +33,15 @@ Sentry.init({
   profilesSampleRate: 1.0,
 });
 
+const corsOptions: cors.CorsOptions = {
+  credentials: true,
+  origin: true,
+};
+
+storage.io = new Server(http, {
+  cors: corsOptions,
+});
+
 const setupExpressApp = async () => {
   app.enable("trust proxy");
   app.use(
@@ -46,15 +55,6 @@ const setupExpressApp = async () => {
   app.use(express.urlencoded({ extended: false }));
   app.use(hpp());
   app.use(morgan("combined"));
-
-  const corsOptions: cors.CorsOptions = {
-    credentials: true,
-    origin: true,
-  };
-
-  storage.io = new Server(http, {
-    cors: corsOptions,
-  });
 
   // const cookieMiddleware = cookieSession({
   //   name: "session",
