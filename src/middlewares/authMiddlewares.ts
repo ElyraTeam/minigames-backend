@@ -36,3 +36,5 @@ export const authUserMiddleware = async (
     throw errors.invalidAuth;
   }
 };
+
+export const authMiddlewares = [authTokenMiddleware, authUserMiddleware];

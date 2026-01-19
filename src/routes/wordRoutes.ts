@@ -14,6 +14,7 @@ import {
 import storage from "../storage.js";
 import { ChatMessageBuilder } from "../utils/chat.js";
 import { errors } from "../config/errors.js";
+import { authMiddlewares } from "../middlewares/authMiddlewares.js";
 const router = express.Router();
 
 const authOptions: basicAuth.BasicAuthMiddlewareOptions = {
@@ -49,7 +50,7 @@ router.get(
   },
 );
 
-router.post("/room/create", (req, res) => {
+router.post("/room/create", ...authMiddlewares, (req, res) => {
   const defaultOptions: WordRoomOptions = {
     maxPlayers: 8,
     categories: DEFAULT_CATEGORIES_ARABIC,
@@ -62,14 +63,14 @@ router.post("/room/create", (req, res) => {
   const game = new WordGame(roomId, req.session!.id!, defaultOptions);
   storage.wordStorage.addGame(game);
 
-  return res.status(200).json({ roomId });
+  res.status(200).json({ roomId });
 });
 
 //check room exists
-router.get("/room/check/:roomId", (req, res) => {
+router.get("/room/check/:roomId", ...authMiddlewares, async (req, res) => {
   const roomId = req.params.roomId;
   const nickname = req.query.nickname;
-  const game = storage.wordStorage.getGame(roomId);
+  const game = storage.wordStorage.getGame(roomId as string);
 
   if (!game) {
     throw errors.roomNotFound;
@@ -90,14 +91,14 @@ router.get("/room/check/:roomId", (req, res) => {
 
   const ownerPlayer = game.getPlayerBySessionId(game.ownerId);
 
-  return res.status(200).json({ roomId, owner: ownerPlayer?.nickname });
+  res.status(200).json({ roomId, owner: ownerPlayer?.nickname });
 });
 
-router.post("/room/join/:roomId", (req, res) => {
+router.post("/room/join/:roomId", ...authMiddlewares, async (req, res) => {
   const roomId = req.params.roomId;
   const { nickname } = req.body as { nickname: string };
 
-  const game = storage.wordStorage.getGame(roomId);
+  const game = storage.wordStorage.getGame(roomId as string);
 
   if (!game) {
     throw errors.roomNotFound;
@@ -164,7 +165,7 @@ router.post("/room/join/:roomId", (req, res) => {
   game.syncRoom();
   game.syncPlayers();
 
-  return res.status(200).json({
+  res.status(200).json({
     roomId,
     roomOptions: game.options,
     authToken,
@@ -172,10 +173,10 @@ router.post("/room/join/:roomId", (req, res) => {
   });
 });
 
-router.post("/room/leave/:roomId", (req, res) => {
+router.post("/room/leave/:roomId", ...authMiddlewares, async (req, res) => {
   const roomId = req.params.roomId;
 
-  const game = storage.wordStorage.getGame(roomId);
+  const game = storage.wordStorage.getGame(roomId as string);
 
   if (!game) {
     throw errors.roomNotFound;
@@ -192,16 +193,16 @@ router.post("/room/leave/:roomId", (req, res) => {
   game.syncRoom();
   game.syncPlayers();
 
-  return res.status(204).end();
+  res.status(204).end();
 });
 
-router.post("/room/kick/:roomId", (req, res) => {
+router.post("/room/kick/:roomId", ...authMiddlewares, async (req, res) => {
   const roomId = req.params.roomId;
   const { toKickId } = req.body as {
     toKickId: string;
   };
 
-  const game = storage.wordStorage.getGame(roomId);
+  const game = storage.wordStorage.getGame(roomId as string);
 
   if (!game) {
     throw errors.roomNotFound;
@@ -226,7 +227,7 @@ router.post("/room/kick/:roomId", (req, res) => {
 
   game.syncRoom();
   game.syncPlayers();
-  return res.status(204).end();
+  res.status(204).end();
 });
 
 // router.post("/room/options/:roomId", (req, res) => {
