@@ -21,6 +21,7 @@ import wordRouter from "./routes/wordRoutes.js";
 import storage from "./storage.js";
 import { errorHandler } from "./utils/errorHandler.js";
 import jwt, { JwtPayload } from "jsonwebtoken";
+import { nanoid } from "nanoid";
 
 const app = express();
 const http = createServer(app);
@@ -76,6 +77,17 @@ const setupExpressApp = async () => {
 const setupRouters = () => {
   app.get("/", (req, res) => {
     res.status(200).send("All good!");
+  });
+
+  app.get("/token", async (req, res) => {
+    const sessionId = nanoid();
+
+    const token = jwt.sign({}, env.JWT_SECRET, {
+      subject: sessionId,
+      expiresIn: "7d",
+    });
+
+    return res.status(200).json({ token });
   });
 
   app.post("/feedback", (req, res) => {
