@@ -10,7 +10,7 @@ import {
   WordClientToServerEvents,
   WordServer,
   WordServerToClientEvents,
-} from "./constants/socketEvents.js";
+} from "./config/socketEvents.js";
 
 class GameStorage<T extends BaseGame> {
   private games: T[] = [];

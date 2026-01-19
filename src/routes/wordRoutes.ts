@@ -12,8 +12,8 @@ import {
   WordRoomOptions,
 } from "../models/word/game.js";
 import storage from "../storage.js";
-import * as errors from "../utils/errors.js";
 import { ChatMessageBuilder } from "../utils/chat.js";
+import { errors } from "../config/errors.js";
 const router = express.Router();
 
 const authOptions: basicAuth.BasicAuthMiddlewareOptions = {
@@ -38,15 +38,15 @@ router.get(
   basicAuth.default(authOptions),
   (req, res) => {
     const roomId = req.params.roomId;
-    const game = storage.wordStorage.getGame(roomId);
+    const game = storage.wordStorage.getGame(roomId as string);
 
     if (!game) {
-      return res.status(404).json(errors.roomNotFound);
+      throw errors.roomNotFound;
     }
 
     res.header("Content-Type", "application/json");
     return res.send(game.toJson());
-  }
+  },
 );
 
 router.post("/room/create", (req, res) => {
@@ -72,18 +72,18 @@ router.get("/room/check/:roomId", (req, res) => {
   const game = storage.wordStorage.getGame(roomId);
 
   if (!game) {
-    return res.status(404).json(errors.roomNotFound);
+    throw errors.roomNotFound;
   }
 
   if (nickname) {
     const foundPlayer = game.getPlayerByNickname(nickname as string);
     if (foundPlayer) {
       if (foundPlayer.sessionId != req.session!.id) {
-        return res.status(403).json(errors.nicknameInUse);
+        throw errors.nicknameInUse;
       }
 
       if (foundPlayer.sessionId == req.session!.id && foundPlayer.online) {
-        return res.status(403).json(errors.alreadyInRoom);
+        throw errors.alreadyInRoom;
       }
     }
   }
@@ -100,25 +100,25 @@ router.post("/room/join/:roomId", (req, res) => {
   const game = storage.wordStorage.getGame(roomId);
 
   if (!game) {
-    return res.status(404).json(errors.roomNotFound);
+    throw errors.roomNotFound;
   }
 
   const foundPlayer = game.getPlayerByNickname(nickname);
   if (foundPlayer) {
     if (foundPlayer.sessionId != req.session!.id) {
-      return res.status(403).json(errors.nicknameInUse);
+      throw errors.nicknameInUse;
     }
     if (foundPlayer.sessionId == req.session!.id && foundPlayer.online) {
-      return res.status(403).json(errors.alreadyInRoom);
+      throw errors.alreadyInRoom;
     }
   }
 
   if (!foundPlayer && game.isFull()) {
-    return res.status(403).json(errors.roomFull);
+    throw errors.roomFull;
   }
 
   if (game.kickedPlayerSessions.includes(req.session!.id!)) {
-    return res.status(403).json(errors.playerBanned);
+    throw errors.playerBanned;
   }
 
   let player: WordPlayer;
@@ -129,7 +129,7 @@ router.post("/room/join/:roomId", (req, res) => {
     reconnect = true;
   } else {
     if (game.state != State.LOBBY) {
-      return res.status(403).json(errors.gameRunning);
+      throw errors.gameRunning;
     }
 
     player = new WordPlayer(nickname, req.session!.id!, authToken);
@@ -145,7 +145,7 @@ router.post("/room/join/:roomId", (req, res) => {
         .addText("عاد ")
         .addText(player.nickname, true)
         .addText(".")
-        .build()
+        .build(),
     );
   } else {
     game.chat(
@@ -153,7 +153,7 @@ router.post("/room/join/:roomId", (req, res) => {
         .addText("انضم ")
         .addText(player.nickname, true)
         .addText(".")
-        .build()
+        .build(),
     );
   }
 
@@ -178,12 +178,12 @@ router.post("/room/leave/:roomId", (req, res) => {
   const game = storage.wordStorage.getGame(roomId);
 
   if (!game) {
-    return res.status(404).json(errors.roomNotFound);
+    throw errors.roomNotFound;
   }
 
   const foundPlayer = game.getPlayerBySessionId(req.session!.id!);
   if (!foundPlayer) {
-    return res.status(404).json(errors.unknownPlayer);
+    throw errors.unknownPlayer;
   }
 
   game.leave(foundPlayer);
@@ -204,21 +204,21 @@ router.post("/room/kick/:roomId", (req, res) => {
   const game = storage.wordStorage.getGame(roomId);
 
   if (!game) {
-    return res.status(404).json(errors.roomNotFound);
+    throw errors.roomNotFound;
   }
 
   const owner = game.getPlayerBySessionId(req.session!.id!);
   if (!owner) {
-    return res.status(403).json(errors.noPermission);
+    throw errors.noPermission;
   }
 
   const toKick = game.getPlayerBySessionId(toKickId);
   if (!toKick) {
-    return res.status(404).json(errors.unknownPlayer);
+    throw errors.unknownPlayer;
   }
 
   if (owner.sessionId === toKick.sessionId) {
-    return res.status(403).json(errors.cantKick);
+    throw errors.cantKick;
   }
 
   game.kick(toKick);
@@ -239,16 +239,16 @@ router.post("/room/kick/:roomId", (req, res) => {
 //   const game = storage.getGame(roomId);
 
 //   if (!game) {
-//     return res.status(404).json(errors.roomNotFound);
+//     throw errors.roomNotFound;
 //   }
 
 //   const owner = game.getPlayerByName(nickname);
 //   if (!owner || owner.sessionId != req.session!.id) {
-//     return res.status(404).json(errors.unknownPlayer);
+//     throw errors.unknownPlayer;
 //   }
 
 //   if (!owner.owner) {
-//     return res.status(403).json(errors.noPermission);
+//     throw errors.noPermission;
 //   }
 
 //   if (
@@ -258,7 +258,7 @@ router.post("/room/kick/:roomId", (req, res) => {
 //     options.maxPlayers < 2 ||
 //     options.rounds < 1
 //   ) {
-//     return res.status(403).json(errors.invalidRoomOptions);
+//     throw errors.invalidRoomOptions;
 //   }
 
 //   game.options = options;

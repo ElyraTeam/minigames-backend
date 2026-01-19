@@ -10,19 +10,19 @@ import {
   WordRoomOptions,
 } from "../models/word/game.js";
 import storage from "../storage.js";
-import { WordSocket } from "../constants/socketEvents.js";
+import { WordSocket } from "../config/socketEvents.js";
 import { ChatMessageBuilder } from "../utils/chat.js";
 
 export const registerPlayerSocket = (
   socket: WordSocket,
   game: Game,
-  player: Player
+  player: Player,
 ) => {
   socket.on("chat", (msg: string) => {
     //check if player is in game
     if (!game.getPlayerBySessionId(player.sessionId)) return;
     game.chat(
-      ChatMessageBuilder.new(player.nickname, "player").addText(msg).build()
+      ChatMessageBuilder.new(player.nickname, "player").addText(msg).build(),
     );
   });
 
@@ -67,7 +67,7 @@ export const registerPlayerSocket = (
       game.syncRoom();
       game.syncOptions();
       storage.saveGames();
-    }
+    },
   );
 
   socket.on("start-game", () => {
@@ -182,7 +182,7 @@ export const registerPlayerSocket = (
 
             game.sendNextCategoryForVoting();
           }
-        }
+        },
       );
     });
   });
@@ -272,7 +272,7 @@ export const registerPlayerSocket = (
         .addText("صوت ")
         .addText(player.nickname, true)
         .addText(".")
-        .build()
+        .build(),
     );
 
     game.updatePlayerVotes();

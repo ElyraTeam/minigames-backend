@@ -6,8 +6,9 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
-  DATABASE_URL: z.string().url(),
+  DATABASE_URL: z.url(),
   COOKIE_SECRET: z.string(),
+  JWT_SECRET: z.string(),
   ADMIN_PASS: z.string(),
 });
 const env = envSchema.parse(process.env);

@@ -1,25 +1,26 @@
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
-import cookieSession from "cookie-session";
 import cors from "cors";
 import "dotenv/config";
-import express, { NextFunction } from "express";
+import express from "express";
 import helmet from "helmet";
 import hpp from "hpp";
 import { createServer } from "http";
 import morgan from "morgan";
 import "reflect-metadata";
 import { Server } from "socket.io";
-import * as errors from "./utils/errors.js";
 
-import env, { isProd } from "./env.js";
+import { errors } from "./config/errors.js";
+import env from "./env.js";
 import { registerPlayerSocket } from "./games/word.js";
-import { sessionMiddleware } from "./middlewares/sessionMiddlewares.js";
 import { AuthenticateRequest } from "./models/base.js";
+import AppError from "./models/error.js";
 import { Feedback } from "./models/feedback.js";
 import { State, WordGame, WordPlayer } from "./models/word/game.js";
 import wordRouter from "./routes/wordRoutes.js";
 import storage from "./storage.js";
+import { errorHandler } from "./utils/errorHandler.js";
+import jwt, { JwtPayload } from "jsonwebtoken";
 
 const app = express();
 const http = createServer(app);
@@ -31,79 +32,121 @@ Sentry.init({
   profilesSampleRate: 1.0,
 });
 
-const corsOptions: cors.CorsOptions = {
-  credentials: true,
-  origin: true,
+const setupExpressApp = async () => {
+  app.enable("trust proxy");
+  app.use(
+    helmet({
+      crossOriginEmbedderPolicy: false,
+      crossOriginOpenerPolicy: false,
+      crossOriginResourcePolicy: false,
+    }),
+  );
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: false }));
+  app.use(hpp());
+  app.use(morgan("combined"));
+
+  const corsOptions: cors.CorsOptions = {
+    credentials: true,
+    origin: true,
+  };
+
+  storage.io = new Server(http, {
+    cors: corsOptions,
+  });
+
+  // const cookieMiddleware = cookieSession({
+  //   name: "session",
+  //   secret: env.COOKIE_SECRET,
+  //   secure: isProd,
+  //   maxAge: 604800000,
+  //   httpOnly: true,
+  //   sameSite: isProd ? "none" : "lax",
+  // });
+  // storage.io.engine.use(cookieMiddleware);
+  // app.use(cookieMiddleware);
+  // app.use(sessionMiddleware);
+
+  setupRouters();
+
+  setupErrorHandlers();
+  errorHandler.listenToErrorEvents();
 };
 
-storage.io = new Server(http, {
-  cors: corsOptions,
-});
+const setupRouters = () => {
+  app.get("/", (req, res) => {
+    res.status(200).send("All good!");
+  });
 
-const PORT = env.PORT || 5000;
+  app.post("/feedback", (req, res) => {
+    const feedback = req.body as Feedback;
+    feedback.receivedAt = Date.now();
 
-app.set("trust proxy", true);
-app.use(
-  helmet({
-    crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false,
-    crossOriginResourcePolicy: false,
-  })
-);
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(hpp());
-app.use(cors(corsOptions));
+    if (!feedback.game || !feedback.message || !feedback.name) {
+      throw errors.unexpected;
+    }
 
-const cookieMiddleware = cookieSession({
-  name: "session",
-  secret: env.COOKIE_SECRET,
-  secure: isProd,
-  maxAge: 604800000,
-  httpOnly: true,
-  sameSite: isProd ? "none" : "lax",
-});
-storage.io.engine.use(cookieMiddleware);
-app.use(cookieMiddleware);
-app.use(morgan("combined"));
+    storage.feedbacks.push(feedback);
+    storage.saveFeedbacks();
+    return res.status(204).end();
+  });
 
-app.use(sessionMiddleware);
+  app.use("/assets", express.static("./static"));
+  app.use("/word", wordRouter);
+};
 
-app.get("/", (req, res) => {
-  res.status(200).send("All good!");
-});
+const setupErrorHandlers = () => {
+  Sentry.setupExpressErrorHandler(app);
 
-app.post("/feedback", (req, res) => {
-  const feedback = req.body as Feedback;
-  feedback.receivedAt = Date.now();
+  app.use((req, res, next) => {
+    next(errors.notFound);
+  });
 
-  if (!feedback.game || !feedback.message || !feedback.name) {
-    return res.status(403).json(errors.unexpectedError);
+  app.use(
+    async (
+      error: unknown,
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      next(await errorHandler.handleError(error));
+    },
+  );
+
+  app.use(
+    async (
+      error: AppError,
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      res.status(error.statusCode).json({
+        success: false,
+        errorCode: error.errorCode,
+        error: error.message,
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+        data: error.data,
+      });
+    },
+  );
+};
+
+storage.io.use((socket, next) => {
+  //TODO: Move to a middleware file
+  const token = socket.handshake.auth.token;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+
+      if (decoded.sub) {
+        (socket.request as any).session = { id: decoded.sub as string };
+        next();
+      }
+    } catch (err) {
+      throw errors.invalidAuth;
+    }
   }
-
-  storage.feedbacks.push(feedback);
-  storage.saveFeedbacks();
-  return res.status(204).end();
 });
-
-app.use("/assets", express.static("./static"));
-app.use("/word", wordRouter);
-
-Sentry.setupExpressErrorHandler(app);
-
-app.use(
-  (
-    err: any,
-    req: express.Request,
-    res: express.Response,
-    next: NextFunction
-  ) => {
-    console.error(err.stack);
-    res
-      .status(500)
-      .json({ ...errors.unexpectedError, id: (res as any).sentry });
-  }
-);
 
 storage.io.on("connection", (socket) => {
   socket.on(
@@ -116,10 +159,10 @@ storage.io.on("connection", (socket) => {
         console.log(
           "Authenticating game",
           gameRoom.id,
-          (socket.request as any).session
+          (socket.request as any).session,
         );
         const player = gameRoom.getPlayerBySessionId(
-          (socket.request as any).session.id
+          (socket.request as any).session.id,
         );
         console.log("Authenticating player", player?.nickname);
         //Word Specific
@@ -192,17 +235,21 @@ storage.io.on("connection", (socket) => {
           }
         }
       }
-    }
+    },
   );
 });
 
 const main = async () => {
+  console.log("Environment: " + env.NODE_ENV);
+
   console.log("Loading data...");
   await Promise.all([storage.loadGames(), storage.loadFeedbacks()]);
+  setupExpressApp();
   startServer();
 };
 
 const startServer = () => {
+  const PORT = env.PORT || 4000;
   console.log("Starting server..");
   http.listen(PORT, () => {
     console.log("listening on *:" + PORT);
