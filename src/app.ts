@@ -1,5 +1,4 @@
 import * as Sentry from "@sentry/node";
-import { nodeProfilingIntegration } from "@sentry/profiling-node";
 import cors from "cors";
 import "dotenv/config";
 import express from "express";
@@ -25,13 +24,6 @@ import { nanoid } from "nanoid";
 
 const app = express();
 const http = createServer(app);
-
-Sentry.init({
-  dsn: "https://9bdafc7f662f41f5bc0c846024ec92f4@o260487.ingest.sentry.io/6179839",
-  integrations: [nodeProfilingIntegration()],
-  tracesSampleRate: 1.0,
-  profilesSampleRate: 1.0,
-});
 
 const corsOptions: cors.CorsOptions = {
   credentials: true,

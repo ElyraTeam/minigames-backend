@@ -1,7 +1,6 @@
-
 # ---- Base image ----
 FROM node:24-slim AS base
-ENV PNPM_VERSION=10.24.0
+ENV PNPM_VERSION=10.26.2
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN apt-get update -y && apt-get install -y openssl wget bash curl python3 python3-pip build-essential \
@@ -17,7 +16,7 @@ RUN chown node:node /app
 # ---- Dependencies ----
 FROM base AS deps
 COPY --chown=node:node package.json pnpm-lock.yaml /app/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prefer-offline --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prefer-offline --frozen-lockfile --dangerously-allow-all-builds 
 ENV PATH=/app/node_modules/.bin:$PATH
 
 
@@ -32,7 +31,8 @@ RUN pnpm run build
 FROM base AS source
 COPY --chown=node:node package.json pnpm-lock.yaml /app/
 COPY --chown=node:node --from=build /app/dist /app/dist
-COPY --chown=node:node --from=build /app/static /app/static
+COPY --chown=node:node --from=build /app/prisma /app/prisma
+COPY --chown=node:node --from=build /app/src/instrument.mjs /app/instrument.mjs
 COPY --chown=node:node --from=deps /app/node_modules /app/node_modules
 
 
@@ -45,6 +45,7 @@ ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
 ENV PATH=/app/node_modules/.bin:$PATH
 RUN pnpm prune --prod
+ENV NODE_OPTIONS="--import ./instrument.mjs"
 # pm2 should be a dependency in package.json, not installed globally
 CMD [ "pm2-runtime", "start", "dist/app.js" ]
 
