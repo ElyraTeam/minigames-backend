@@ -144,22 +144,23 @@ const setupErrorHandlers = () => {
   );
 };
 
-// storage.io.use((socket, next) => {
-//   //TODO: Move to a middleware file
-//   const token = socket.handshake.auth.token;
-//   if (token) {
-//     try {
-//       const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+storage.io.use((socket, next) => {
+  //TODO: Move to a middleware file
+  const token = socket.handshake.auth.token;
+  console.log("Token:", token);
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
 
-//       if (decoded.sub) {
-//         (socket.request as any).session = { id: decoded.sub as string };
-//         next();
-//       }
-//     } catch (err) {
-//       throw errors.invalidAuth;
-//     }
-//   }
-// });
+      if (decoded.sub) {
+        (socket.request as any).session = { id: decoded.sub as string };
+        next();
+      }
+    } catch (err) {
+      next(errors.invalidAuth);
+    }
+  }
+});
 
 storage.io.on("connection", (socket) => {
   socket.on(
