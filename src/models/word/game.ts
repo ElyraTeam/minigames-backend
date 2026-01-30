@@ -294,6 +294,7 @@ export class WordGame implements BaseGame {
       ownerId: this.ownerId,
       currentRound: this.currentRound,
       currentLetter: this.currentLetter,
+      doneLetters: this.doneLetters,
       stopClicker: this.roundData[this.currentRound]?.stopClickerId,
     });
   }
