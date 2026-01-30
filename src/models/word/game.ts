@@ -361,7 +361,7 @@ export class WordGame implements BaseGame {
     );
 
     if (availableLetters.length === 0) {
-      this.toOwner().emit(
+      this.toOwner()?.emit(
         "alert",
         "تم انتهاء جميع الحروف، ابدأ اللعبة من جديد",
         "warning",
@@ -382,7 +382,7 @@ export class WordGame implements BaseGame {
   }
 
   toOwner() {
-    return storage.io.to(this.ownerId);
+    return this.players.find((p) => p.sessionId == this.ownerId)?.getSocket();
   }
 
   updateVoteCount() {
