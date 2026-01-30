@@ -83,6 +83,9 @@ export const registerPlayerSocket = (
       game.currentRound <= game.options.rounds
     ) {
       const letter = game.newRandomLetter();
+      if (!letter) {
+        return;
+      }
       game.toAllPlayers().emit("start-timer", 3);
 
       setTimeout(() => {
@@ -115,7 +118,6 @@ export const registerPlayerSocket = (
 
     roundData.stopClickerId = player.sessionId;
 
-    game.doneLetters.push(game.currentLetter);
     game.stoppedAt = Date.now();
     game.state = State.WAITING;
     game.syncRoom();

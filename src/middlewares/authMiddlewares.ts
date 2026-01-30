@@ -31,6 +31,8 @@ export const authUserMiddleware = async (
     if (decoded.sub) {
       req.session = { id: decoded.sub as string };
       next();
+    } else {
+      throw errors.invalidAuth;
     }
   } catch (err) {
     throw errors.invalidAuth;

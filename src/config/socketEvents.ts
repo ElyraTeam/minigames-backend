@@ -18,7 +18,7 @@ export interface WordClientToServerEvents {
   /**Client authenticating with server */
   authenticate: (
     data: AuthenticateRequest,
-    ack?: (res: string) => void
+    ack?: (res: string) => void,
   ) => void;
   /**For /ping and offline checks */
   ping: (cb: () => void) => void;
@@ -58,9 +58,13 @@ export interface WordServerToClientEvents {
   "update-vote-count": (count: number) => void;
   "player-votes": (votes: ClientVotes) => void;
   "request-values": (
-    ack: (values: { [catName: string]: string }) => void
+    ack: (values: { [catName: string]: string }) => void,
   ) => void;
   "game-over": (top3: WordPlayer[]) => void;
+  alert: (
+    message: string,
+    severity: "success" | "error" | "warning" | "info",
+  ) => void;
 }
 
 export type WordSocket = Socket<

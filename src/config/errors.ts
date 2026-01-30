@@ -20,4 +20,6 @@ export const errors = {
   alreadyInRoom: AppError.custom(400, 1009, "انت بالفعل في هذه الغرفة."),
 
   invalidAuth: AppError.custom(401, 1012, "رمز التوثيق غير صالح."),
+
+  missingFeedbackFields: AppError.custom(400, 1013, "ادخل الخانات المطلوبة."),
 };

@@ -80,7 +80,7 @@ const setupRouters = () => {
       expiresIn: "7d",
     });
 
-    return res.status(200).json({ token });
+    res.status(200).json({ token });
   });
 
   app.post("/feedback", (req, res) => {
@@ -88,12 +88,12 @@ const setupRouters = () => {
     feedback.receivedAt = Date.now();
 
     if (!feedback.game || !feedback.message || !feedback.name) {
-      throw errors.unexpected;
+      throw errors.missingFeedbackFields;
     }
 
     storage.feedbacks.push(feedback);
     storage.saveFeedbacks();
-    return res.status(204).end();
+    res.status(204).end();
   });
 
   app.use("/assets", express.static("./static"));
@@ -147,6 +147,8 @@ storage.io.use((socket, next) => {
       if (decoded.sub) {
         (socket.request as any).session = { id: decoded.sub as string };
         next();
+      } else {
+        next(errors.invalidAuth);
       }
     } catch (err) {
       next(errors.invalidAuth);

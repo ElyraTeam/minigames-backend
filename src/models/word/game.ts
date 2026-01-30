@@ -100,7 +100,7 @@ export class WordGame implements BaseGame {
   constructor(
     public id: string,
     public ownerId: string,
-    public options: WordRoomOptions
+    public options: WordRoomOptions,
   ) {}
 
   toJson() {
@@ -108,7 +108,7 @@ export class WordGame implements BaseGame {
       this,
       (key, value) =>
         value instanceof Map ? Object.fromEntries(value) : value,
-      2
+      2,
     );
   }
 
@@ -132,10 +132,10 @@ export class WordGame implements BaseGame {
     const roundData = this.roundData[this.currentRound];
     if (roundData) {
       const values = Object.values(roundData.playerValues).map(
-        (val) => val[category]
+        (val) => val[category],
       );
       const occurrences = values.filter(
-        (val) => val !== "" && val != undefined && val != null && val == value
+        (val) => val !== "" && val != undefined && val != null && val == value,
       ).length;
       return occurrences > 1;
     }
@@ -216,7 +216,7 @@ export class WordGame implements BaseGame {
           .addText("بداية التصويت لـ(")
           .addText(this.options.categories[this.currentVotingCategory], true)
           .addText(")")
-          .build()
+          .build(),
       );
     }
   }
@@ -243,7 +243,7 @@ export class WordGame implements BaseGame {
         const v = Object.values(roundData.votes[id][category]);
         let maj = 0;
         if (v.length > 0) {
-          maj = findMajority(v);
+          maj = findMajority(v) ?? 0;
         }
         const p = this.getPlayerBySessionId(id);
         if (p) {
@@ -330,7 +330,7 @@ export class WordGame implements BaseGame {
         .addText("تم طرد ")
         .addText(toKick.nickname, true)
         .addText(".")
-        .build()
+        .build(),
     );
 
     toKick.getSocket()?.emit("kick", "تم طردك من الغرفة.");
@@ -345,7 +345,7 @@ export class WordGame implements BaseGame {
         .addText("غادر ")
         .addText(toLeave.nickname, true)
         .addText(".")
-        .build()
+        .build(),
     );
 
     toLeave.getSocket()?.disconnect(true);
@@ -356,34 +356,46 @@ export class WordGame implements BaseGame {
   }
 
   newRandomLetter() {
-    let letter =
-      this.options.letters[
-        Math.floor(Math.random() * this.options.letters.length)
-      ];
-    while (this.doneLetters.includes(letter)) {
-      letter =
-        this.options.letters[
-          Math.floor(Math.random() * this.options.letters.length)
-        ];
+    const availableLetters = this.options.letters.filter(
+      (letter) => !this.doneLetters.includes(letter),
+    );
+
+    if (availableLetters.length === 0) {
+      this.toOwner().emit(
+        "alert",
+        "تم انتهاء جميع الحروف، ابدأ اللعبة من جديد",
+        "warning",
+      );
+      return null;
     }
-    return letter;
+
+    const randomIndex = Math.floor(Math.random() * availableLetters.length);
+    const selectedLetter = availableLetters[randomIndex];
+
+    this.doneLetters.push(selectedLetter);
+
+    return selectedLetter;
   }
 
   toAllPlayers() {
     return storage.io.to(this.id);
   }
 
+  toOwner() {
+    return storage.io.to(this.ownerId);
+  }
+
   updateVoteCount() {
     this.toAllPlayers().emit(
       "update-vote-count",
-      this.roundData[this.currentRound]?.confirmedVotes.length ?? 0
+      this.roundData[this.currentRound]?.confirmedVotes.length ?? 0,
     );
   }
 
   updatePlayerVotes() {
     this.toAllPlayers().emit(
       "player-votes",
-      this.roundData[this.currentRound]?.clientVotes ?? {}
+      this.roundData[this.currentRound]?.clientVotes ?? {},
     );
   }
 
@@ -420,7 +432,7 @@ export class WordGame implements BaseGame {
 
       if (roundData.confirmedVotes.includes(sessionId)) {
         roundData.confirmedVotes = roundData.confirmedVotes.filter(
-          (n) => n !== sessionId
+          (n) => n !== sessionId,
         );
       }
 
@@ -474,7 +486,7 @@ export class WordGame implements BaseGame {
               .addText("اصبح ")
               .addText(newOwner.nickname, true)
               .addText(" المسؤول.")
-              .build()
+              .build(),
           );
         }
       }
@@ -489,7 +501,7 @@ export class WordPlayer extends BasePlayer {
   constructor(
     public nickname: string,
     public sessionId: string,
-    protected authToken: string
+    protected authToken: string,
   ) {
     super(authToken, nickname, sessionId);
   }
