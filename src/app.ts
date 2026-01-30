@@ -157,6 +157,21 @@ storage.io.use((socket, next) => {
 });
 
 storage.io.on("connection", (socket) => {
+  if (socket.recovered) {
+    const gameId = socket.data.gameId;
+    const gameRoom = storage
+      .getStorageForGame(gameId)
+      .getGame(socket.data.roomId);
+    if (gameRoom && gameRoom instanceof WordGame) {
+      const player = gameRoom.getPlayerBySessionId(socket.data.sessionId);
+      if (player) {
+        player.online = true;
+        player.socketId = socket.id;
+        gameRoom.syncPlayers();
+      }
+    }
+  }
+
   socket.on(
     "authenticate",
     (data: AuthenticateRequest, ack?: (res: string) => void) => {
@@ -216,6 +231,7 @@ storage.io.on("connection", (socket) => {
           player.socketId = socket.id;
           player.online = true;
 
+          socket.data.gameId = gameRoom.id;
           socket.data.nickname = player.nickname;
           socket.data.sessionId = player.sessionId;
 

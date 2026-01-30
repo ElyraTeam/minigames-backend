@@ -21,6 +21,19 @@ export const registerPlayerSocket = (
   socket.on("chat", (msg: string) => {
     //check if player is in game
     if (!game.getPlayerBySessionId(player.sessionId)) return;
+
+    if (msg.startsWith("/")) {
+      const command = msg.slice(1);
+      switch (command) {
+        case "testalert": //Can be /testalert error hi everyone
+          const parts = msg.split(" ");
+          const sev = parts[1];
+          const message = parts.slice(2).join(" ");
+          socket.emit("alert", message, sev as any);
+          break;
+      }
+    }
+
     game.chat(
       ChatMessageBuilder.new(player.nickname, "player").addText(msg).build(),
     );
