@@ -61,6 +61,9 @@ export const registerPlayerSocket = (
       ) {
         ack?.("Invalid options");
       } else {
+        if (options.rounds > options.letters.length) {
+          options.rounds = options.letters.length;
+        }
         game.options = options;
       }
 
