@@ -23,11 +23,11 @@ export const registerPlayerSocket = (
     if (!game.getPlayerBySessionId(player.sessionId)) return;
 
     if (msg.startsWith("/")) {
-      const command = msg.slice(1);
+      const parts = msg.slice(1).split(" ");
+      const command = parts[0];
+      console.log(parts);
       switch (command) {
         case "testalert": //Can be /testalert error hi everyone
-          const parts = msg.split(" ");
-          console.log(parts);
           const sev = parts[1];
           const message = parts.slice(2).join(" ");
           socket.emit("alert", message, sev as any);
