@@ -27,16 +27,17 @@ export const registerPlayerSocket = (
       switch (command) {
         case "testalert": //Can be /testalert error hi everyone
           const parts = msg.split(" ");
+          console.log(parts);
           const sev = parts[1];
           const message = parts.slice(2).join(" ");
           socket.emit("alert", message, sev as any);
           break;
       }
+    } else {
+      game.chat(
+        ChatMessageBuilder.new(player.nickname, "player").addText(msg).build(),
+      );
     }
-
-    game.chat(
-      ChatMessageBuilder.new(player.nickname, "player").addText(msg).build(),
-    );
   });
 
   //Allow reusing lobby after game is over
