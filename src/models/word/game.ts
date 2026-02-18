@@ -94,6 +94,7 @@ export class WordGame implements BaseGame {
   public stoppedAt: number = 0;
   public createdAt: Date = new Date();
   public gameId: GameId = "word";
+  public skipRoundVotes: string[] = [];
 
   public roundData: { [key: number]: RoundData | undefined } = {};
 
@@ -119,6 +120,7 @@ export class WordGame implements BaseGame {
     this.roundData = {};
     this.currentVotingCategory = 0;
     this.currentRound = 1;
+    this.skipRoundVotes = [];
     this.stoppedAt = 0;
     this.players.forEach((p) => {
       p.totalScore = 0;
@@ -303,6 +305,7 @@ export class WordGame implements BaseGame {
         } else {
           this.state = State.LOBBY;
           this.currentRound++;
+          this.skipRoundVotes = [];
         }
 
         this.currentLetter = "";
@@ -333,6 +336,7 @@ export class WordGame implements BaseGame {
       currentLetter: this.currentLetter,
       doneLetters: this.doneLetters,
       stopClicker: this.roundData[this.currentRound]?.stopClickerId,
+      skipRoundVotes: this.skipRoundVotes.length,
     });
   }
 

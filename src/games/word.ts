@@ -300,4 +300,22 @@ export const registerPlayerSocket = (
 
     storage.saveGames();
   });
+
+  socket.on("skip-round", () => {
+    if (game.state != State.INGAME) return;
+    if (game.hasPlayerWithSessionId(player.sessionId)) return;
+
+    if (!game.skipRoundVotes.includes(player.sessionId)) {
+      game.skipRoundVotes.push(player.sessionId);
+    }
+
+    //if more than half of players voted to skip
+    if (game.skipRoundVotes.length >= Math.ceil(game.players.length / 2)) {
+      game.skipRoundVotes = [];
+      game.state = State.LOBBY;
+      delete game.roundData[game.currentRound];
+      game.syncRoom();
+      storage.saveGames();
+    }
+  });
 };

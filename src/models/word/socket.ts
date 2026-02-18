@@ -16,6 +16,7 @@ export interface RoomSyncData {
   currentLetter: string;
   stopClicker?: string;
   doneLetters: string[];
+  skipRoundVotes: number;
 }
 
 export interface OptionsSyncData {

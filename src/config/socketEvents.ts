@@ -38,6 +38,8 @@ export interface WordClientToServerEvents {
   vote: (voteData: Points) => void;
   /**Player confirming vote */
   "confirm-vote": () => void;
+  /**Player voting to skip this round */
+  "skip-round": () => void;
 }
 
 export interface WordServerToClientEvents {
