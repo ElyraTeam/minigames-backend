@@ -359,6 +359,7 @@ export class WordGame implements BaseGame {
         lastRoundScore: p.lastRoundScore,
         voted: p.voted,
         ready: p.ready,
+        votedSkip: this.skipRoundVotes.includes(p.sessionId),
       })),
     });
   }

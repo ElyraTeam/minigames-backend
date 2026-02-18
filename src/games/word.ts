@@ -302,11 +302,21 @@ export const registerPlayerSocket = (
   });
 
   socket.on("skip-round", () => {
-    if (game.state != State.INGAME) return;
+    // if (game.state != State.INGAME) return;
     if (game.hasPlayerWithSessionId(player.sessionId)) return;
 
     if (!game.skipRoundVotes.includes(player.sessionId)) {
       game.skipRoundVotes.push(player.sessionId);
+
+      game.chat(
+        ChatMessageBuilder.new("system", "system")
+          .addText("صوت ")
+          .addText(player.nickname, true)
+          .addText(" لتخطي الجولة (")
+          .addText(game.skipRoundVotes.length.toString(), true)
+          .addText("/" + Math.ceil(game.players.length / 2) + ")")
+          .build(),
+      );
     }
 
     //if more than half of players voted to skip
@@ -317,6 +327,7 @@ export const registerPlayerSocket = (
     }
 
     game.syncRoom();
+    game.syncPlayers();
     storage.saveGames();
   });
 };
