@@ -198,6 +198,7 @@ storage.io.on("connection", (socket) => {
           socket.on("disconnect", () => {
             player.socketId = undefined;
             player.online = false;
+            player.ready = false;
             player.offlineAt = Date.now();
             gameRoom.syncPlayers();
             storage.saveGames();
