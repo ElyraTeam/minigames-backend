@@ -314,8 +314,9 @@ export const registerPlayerSocket = (
       game.skipRoundVotes = [];
       game.state = State.LOBBY;
       delete game.roundData[game.currentRound];
-      game.syncRoom();
-      storage.saveGames();
     }
+
+    game.syncRoom();
+    storage.saveGames();
   });
 };
