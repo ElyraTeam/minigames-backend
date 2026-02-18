@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node dist/app.js",
     "dev": "cross-env NODE_ENV=development tsx watch src/app.ts",
-    "test": "tsc && node dist/test.js",
+    "test": "vitest run",
     "build": "tsc"
   },
   "engines": {
@@ -54,6 +54,7 @@
     "@types/uuid": "^11.0.0",
     "cross-env": "^10.1.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

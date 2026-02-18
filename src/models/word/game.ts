@@ -236,14 +236,51 @@ export class WordGame implements BaseGame {
   checkEveryoneVoted() {
     const roundData = this.roundData[this.currentRound];
     const category = this.options.categories[this.currentVotingCategory];
-    if (roundData && roundData.confirmedVotes.length === this.players.length) {
+
+    if (!roundData) return;
+
+    let proceed = false;
+    const votersCount = Math.max(0, this.players.length - 1);
+
+    if (roundData.confirmedVotes.length === this.players.length) {
+      proceed = true;
+    } else {
+      const threshold = votersCount / 2;
+      const allSettled = this.players.every((p) => {
+        const votes = Object.values(
+          roundData.votes[p.sessionId]?.[category] ?? {},
+        );
+
+        // Check if major winner is already determined
+        if (findMajority(votes, votersCount) !== null) return true;
+
+        // Check if it's impossible for anyone to win
+        const counts: { [key: number]: number } = {};
+        let maxFreq = 0;
+        for (const v of votes) {
+          counts[v] = (counts[v] || 0) + 1;
+          maxFreq = Math.max(maxFreq, counts[v]);
+        }
+
+        const votesMissing = votersCount - votes.length;
+        const potentialMax = Math.max(maxFreq + votesMissing, votesMissing);
+
+        return potentialMax <= threshold;
+      });
+
+      if (allSettled) {
+        proceed = true;
+      }
+    }
+
+    if (proceed) {
       //voting done, update final points and initiate new round
 
       Object.keys(roundData.votes).forEach((id) => {
         const v = Object.values(roundData.votes[id][category]);
         let maj = 0;
         if (v.length > 0) {
-          maj = findMajority(v) ?? 0;
+          maj = findMajority(v, votersCount) ?? 0;
         }
         const p = this.getPlayerBySessionId(id);
         if (p) {

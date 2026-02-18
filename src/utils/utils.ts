@@ -1,4 +1,7 @@
-export const findMajority = (nums: number[]): number | null => {
+export const findMajority = (
+  nums: number[],
+  totalVotes?: number,
+): number | null => {
   if (nums.length === 0) return null;
 
   let count = 0;
@@ -22,6 +25,7 @@ export const findMajority = (nums: number[]): number | null => {
     if (num === candidate) count++;
   }
 
-  // Return candidate if it's a true majority, otherwise null
-  return count > nums.length / 2 ? candidate : null;
+  // Return candidate if it's a true majority based on provided total or current array length
+  const threshold = (totalVotes ?? nums.length) / 2;
+  return count > threshold ? candidate : null;
 };
