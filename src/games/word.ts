@@ -303,8 +303,7 @@ export const registerPlayerSocket = (
 
   socket.on("reroll", () => {
     // if (game.state != State.INGAME) return;
-    if (game.hasPlayerWithSessionId(player.sessionId)) return;
-
+    // if (game.hasPlayerWithSessionId(player.sessionId)) return;
     if (!game.rerollVotes.includes(player.sessionId)) {
       game.rerollVotes.push(player.sessionId);
 
@@ -314,13 +313,13 @@ export const registerPlayerSocket = (
           .addText(player.nickname, true)
           .addText(" لتغيير الحرف (")
           .addText(game.rerollVotes.length.toString(), true)
-          .addText("/" + Math.ceil(game.players.length / 2) + ")")
+          .addText("/" + (Math.ceil(game.players.length / 2) + 1) + ")")
           .build(),
       );
     }
 
     //if more than half of players voted to reroll
-    if (game.rerollVotes.length >= Math.ceil(game.players.length / 2)) {
+    if (game.rerollVotes.length > Math.ceil(game.players.length / 2)) {
       game.rerollVotes = [];
       const oldLetter = game.currentLetter;
       const newLetter = game.newRandomLetter();
@@ -340,7 +339,9 @@ export const registerPlayerSocket = (
           clientVotes: {},
         };
       }
-      socket.emit("reroll", oldLetter, newLetter);
+      //timer
+      game.toAllPlayers().emit("start-timer", 3);
+      game.toAllPlayers().emit("reroll", oldLetter, newLetter);
     }
 
     game.syncRoom();
