@@ -51,12 +51,15 @@ router.get(
 );
 
 router.post("/room/create", ...authMiddlewares, (req, res) => {
+  const userOptions: Partial<WordRoomOptions> | undefined = req.body.options;
+
   const defaultOptions: WordRoomOptions = {
     maxPlayers: 8,
     categories: DEFAULT_CATEGORIES_ARABIC,
-    letters: CHARS_ARABIC,
+    letters: CHARS_ARABIC.slice(0, 10),
     rounds: 4,
     isPrivate: true,
+    ...userOptions,
   };
 
   const roomId = nanoid(8);
