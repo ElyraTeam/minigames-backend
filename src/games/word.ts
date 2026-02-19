@@ -301,29 +301,46 @@ export const registerPlayerSocket = (
     storage.saveGames();
   });
 
-  socket.on("skip-round", () => {
+  socket.on("reroll", () => {
     // if (game.state != State.INGAME) return;
     if (game.hasPlayerWithSessionId(player.sessionId)) return;
 
-    if (!game.skipRoundVotes.includes(player.sessionId)) {
-      game.skipRoundVotes.push(player.sessionId);
+    if (!game.rerollVotes.includes(player.sessionId)) {
+      game.rerollVotes.push(player.sessionId);
 
       game.chat(
         ChatMessageBuilder.new("system", "system")
           .addText("صوت ")
           .addText(player.nickname, true)
-          .addText(" لتخطي الجولة (")
-          .addText(game.skipRoundVotes.length.toString(), true)
+          .addText(" لتغيير الحرف (")
+          .addText(game.rerollVotes.length.toString(), true)
           .addText("/" + Math.ceil(game.players.length / 2) + ")")
           .build(),
       );
     }
 
-    //if more than half of players voted to skip
-    if (game.skipRoundVotes.length >= Math.ceil(game.players.length / 2)) {
-      game.skipRoundVotes = [];
-      game.state = State.LOBBY;
-      delete game.roundData[game.currentRound];
+    //if more than half of players voted to reroll
+    if (game.rerollVotes.length >= Math.ceil(game.players.length / 2)) {
+      game.rerollVotes = [];
+      const oldLetter = game.currentLetter;
+      const newLetter = game.newRandomLetter();
+      if (!newLetter) {
+        return;
+      }
+      game.currentLetter = newLetter;
+      if (game.roundData[game.currentRound]) {
+        game.roundData[game.currentRound] = {
+          round: game.currentRound,
+          letter: game.currentLetter,
+          stopClickerId: "",
+          playerValues: {},
+          finalPoints: {},
+          confirmedVotes: [],
+          votes: {},
+          clientVotes: {},
+        };
+      }
+      socket.emit("reroll", oldLetter, newLetter);
     }
 
     game.syncRoom();

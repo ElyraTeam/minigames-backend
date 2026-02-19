@@ -39,7 +39,7 @@ export interface WordClientToServerEvents {
   /**Player confirming vote */
   "confirm-vote": () => void;
   /**Player voting to skip this round */
-  "skip-round": () => void;
+  reroll: () => void;
 }
 
 export interface WordServerToClientEvents {
@@ -67,6 +67,7 @@ export interface WordServerToClientEvents {
     message: string,
     severity: "success" | "error" | "warning" | "info",
   ) => void;
+  reroll: (oldLetter: string, newLetter: string) => void;
 }
 
 export type WordSocket = Socket<
