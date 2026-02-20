@@ -40,6 +40,7 @@ export interface WordClientToServerEvents {
   "confirm-vote": () => void;
   /**Player voting to skip this round */
   reroll: () => void;
+  "submit-values": (values: { [catName: string]: string }) => void;
 }
 
 export interface WordServerToClientEvents {

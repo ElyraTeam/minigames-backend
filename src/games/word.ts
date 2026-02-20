@@ -180,10 +180,6 @@ export const registerPlayerSocket = (
                 values[cat] = "";
               }
             });
-          } else {
-            game.options.categories.forEach((cat) => {
-              values[cat] = "";
-            });
           }
           roundData.playerValues[p.sessionId] = values;
           //Check if every player sent their data
@@ -347,5 +343,30 @@ export const registerPlayerSocket = (
     game.syncRoom();
     game.syncPlayers();
     storage.saveGames();
+  });
+
+  socket.on("submit-values", (values: { [catName: string]: string }) => {
+    const p = game.getPlayerBySessionId(player.sessionId);
+    if (!p) return;
+    if (game.state != State.INGAME) return;
+
+    const roundData = game.roundData[game.currentRound];
+    if (!roundData) return;
+
+    game.options.categories.forEach((cat) => {
+      if (!values[cat]) {
+        values[cat] = "";
+      }
+      values[cat] = values[cat].trim();
+
+      if (values[cat].length > 100) {
+        values[cat] = values[cat].slice(0, 100);
+      }
+
+      if (values[cat].length < 2) {
+        values[cat] = "";
+      }
+    });
+    roundData.playerValues[p.sessionId] = values;
   });
 };
